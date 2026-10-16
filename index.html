@@ -45,8 +45,8 @@
         <div class="card">
             <div class="form-grid">
                 <div class="form-item full-width">
-                    <label>高德API Key（Web端JS API）</label>
-                    <input type="text" id="apiKey" placeholder="请输入高德开放平台JS API Key">
+                    <label>高德API Key（Web服务类型）</label>
+                    <input type="text" id="apiKey" placeholder="请输入高德开放平台Web服务Key">
                 </div>
                 <div class="form-item">
                     <label>省份</label>
@@ -118,7 +118,7 @@
 
             <div class="tips">
                 <strong>使用说明：</strong><br>
-                1. 使用Web端(JS API)类型的Key，域名白名单已配置<br>
+                1. 使用Web服务类型的Key，IP白名单请清空<br>
                 2. 选择省、市、区县，输入关键词，点击开始采集<br>
                 3. 采集完成后点击下载按钮导出结果
             </div>
@@ -147,7 +147,14 @@
     <script>
         let allResults = [];
         let isRunning = false;
-        let placeSearch = null;
+
+        // 多个CORS代理备用
+        const proxies = [
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://thingproxy.freeboard.io/fetch/'
+        ];
+        let currentProxy = 0;
 
         // 省市区数据
         const regionData = {
@@ -204,7 +211,23 @@
             }
         }
 
-        function startSearch() {
+        async function fetchWithProxy(url) {
+            for (let i = 0; i < proxies.length; i++) {
+                try {
+                    const proxyUrl = proxies[i] + encodeURIComponent(url);
+                    const response = await fetch(proxyUrl);
+                    if (response.ok) {
+                        currentProxy = i;
+                        return await response.json();
+                    }
+                } catch (e) {
+                    console.log(`代理 ${i} 失败:`, e);
+                }
+            }
+            throw new Error('所有代理都失败了');
+        }
+
+        async function startSearch() {
             const key = document.getElementById('apiKey').value.trim();
             const city = document.getElementById('city').value;
             const district = document.getElementById('district').value;
@@ -216,96 +239,66 @@
             if (!city) { alert('请选择城市'); return; }
             if (!keywords) { alert('请输入搜索关键词'); return; }
 
-            // 组合搜索关键词（加上区县）
             let searchKeywords = keywords;
             if (district) {
                 searchKeywords = `${district} ${keywords}`;
             }
 
-            alert('正在加载高德SDK...\nKey: ' + key + '\n城市: ' + city + '\n关键词: ' + searchKeywords);
-
-            // 加载JS API
-            const script = document.createElement('script');
-            script.src = `https://webapi.amap.com/maps?v=2.0&key=${key}&plugin=AMap.PlaceSearch`;
-            script.onload = () => {
-                alert('SDK加载成功，开始搜索...');
-                doSearch(city, searchKeywords, maxPages, citylimit);
-            };
-            script.onerror = () => {
-                alert('SDK加载失败！\n可能原因：\n1. Key不正确\n2. 域名白名单未配置 q599795917.github.io\n3. Key类型不是Web端JS API');
-            };
-            document.head.appendChild(script);
+            alert('开始采集！\nKey: ' + key + '\n城市: ' + city + '\n关键词: ' + searchKeywords);
 
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             allResults = [];
             isRunning = true;
-        }
 
-        function doSearch(city, keywords, maxPages, citylimit) {
             try {
-                placeSearch = new AMap.PlaceSearch({
-                    city: city,
-                    citylimit: citylimit,
-                    pageSize: 20,
-                    pageIndex: 1,
-                    extensions: 'all'
-                });
-            } catch (e) {
-                alert('创建搜索对象失败: ' + e.message);
-                finish();
-                return;
-            }
+                let currentPage = 1;
+                let total = 0;
 
-            let currentPage = 1;
+                while (isRunning && currentPage <= maxPages) {
+                    document.getElementById('progressInfo').textContent = `正在采集第 ${currentPage} 页...`;
 
-            function searchPage() {
-                if (!isRunning) return;
+                    const apiUrl = `https://restapi.amap.com/v3/place/text?key=${key}&keywords=${encodeURIComponent(searchKeywords)}&city=${encodeURIComponent(city)}&citylimit=${citylimit}&page_size=20&page_num=${currentPage}&extensions=all`;
+                    
+                    const data = await fetchWithProxy(apiUrl);
 
-                document.getElementById('progressInfo').textContent = `正在采集第 ${currentPage} 页...`;
-
-                placeSearch.search(keywords, function(status, result) {
-                    if (!isRunning) return;
-
-                    if (status === 'complete') {
-                        const pois = result.poiList.pois;
-                        const total = result.poiList.count;
-
-                        alert(`搜索成功！共${total}条，本页${pois.length}条`);
-
-                        pois.forEach(poi => {
-                            allResults.push({
-                                '商家名称': poi.name || '',
-                                '地址': poi.address || '',
-                                '电话': poi.tel || '',
-                                '类目': poi.type || '',
-                                '省份': poi.pname || '',
-                                '城市': poi.cityname || '',
-                                '区域': poi.adname || '',
-                                '经度': poi.location ? poi.location.lng : '',
-                                '纬度': poi.location ? poi.location.lat : ''
-                            });
-                        });
-
-                        updateStats();
-                        renderTable();
-
-                        currentPage++;
-                        if (currentPage <= maxPages && allResults.length < total) {
-                            document.getElementById('progressInfo').textContent = `已采集 ${allResults.length} / ${total} 条，继续下一页...`;
-                            placeSearch.setPageIndex(currentPage);
-                            setTimeout(searchPage, 500);
-                        } else {
-                            finish();
-                        }
-                    } else {
-                        alert(`搜索失败！状态: ${status}\n${JSON.stringify(result)}`);
-                        finish();
+                    if (data.status !== '1') {
+                        alert(`API错误: ${data.info} (状态码: ${data.infocode})`);
+                        break;
                     }
-                });
-            }
 
-            searchPage();
+                    total = data.count;
+                    const pois = data.pois || [];
+
+                    alert(`第${currentPage}页成功！共${total}条，本页${pois.length}条`);
+
+                    pois.forEach(poi => {
+                        allResults.push({
+                            '商家名称': poi.name || '',
+                            '地址': poi.address || '',
+                            '电话': poi.tel || '',
+                            '类目': poi.type || '',
+                            '省份': poi.pname || '',
+                            '城市': poi.cityname || '',
+                            '区域': poi.adname || '',
+                            '经度': poi.location ? poi.location.split(',')[0] : '',
+                            '纬度': poi.location ? poi.location.split(',')[1] : ''
+                        });
+                    });
+
+                    updateStats();
+                    renderTable();
+
+                    if (allResults.length >= total) break;
+                    currentPage++;
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                finish();
+            } catch (e) {
+                alert(`出错了: ${e.message}`);
+                finish();
+            }
         }
 
         function stopSearch() {
@@ -327,7 +320,7 @@
             document.getElementById('stats').style.display = 'flex';
             document.getElementById('totalNum').textContent = allResults.length;
             document.getElementById('collectedNum').textContent = allResults.length;
-            const hasPhone = allResults.filter(r => r['电话']).length;
+            const hasPhone = allResults.filter(r => r['电话'] && r['电话'] !== '[]').length;
             document.getElementById('hasPhoneNum').textContent = hasPhone;
         }
 
