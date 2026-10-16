@@ -45,8 +45,8 @@
         <div class="card">
             <div class="form-grid">
                 <div class="form-item full-width">
-                    <label>高德API Key（Web服务类型）</label>
-                    <input type="text" id="apiKey" placeholder="请输入高德开放平台Web服务Key">
+                    <label>高德API Key（Web端JS API）</label>
+                    <input type="text" id="apiKey" placeholder="请输入高德开放平台JS API Key">
                 </div>
                 <div class="form-item">
                     <label>省份</label>
@@ -118,7 +118,7 @@
 
             <div class="tips">
                 <strong>使用说明：</strong><br>
-                1. 本工具使用「Web服务」类型的Key，你申请的Key直接就能用<br>
+                1. 使用Web端(JS API)类型的Key，域名白名单已配置<br>
                 2. 选择省、市、区县，输入关键词，点击开始采集<br>
                 3. 采集完成后点击下载按钮导出结果
             </div>
@@ -147,6 +147,7 @@
     <script>
         let allResults = [];
         let isRunning = false;
+        let placeSearch = null;
 
         // 省市区数据
         const regionData = {
@@ -203,9 +204,8 @@
             }
         }
 
-        async function startSearch() {
+        function startSearch() {
             const key = document.getElementById('apiKey').value.trim();
-            const province = document.getElementById('province').value;
             const city = document.getElementById('city').value;
             const district = document.getElementById('district').value;
             const keywords = document.getElementById('keywords').value.trim();
@@ -222,89 +222,81 @@
                 searchKeywords = `${district} ${keywords}`;
             }
 
+            // 加载JS API
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${key}&plugin=AMap.PlaceSearch`;
+            script.onload = () => doSearch(city, searchKeywords, maxPages, citylimit);
+            script.onerror = () => alert('Key加载失败，请检查Key是否正确，以及域名白名单是否包含 q599795917.github.io');
+            document.head.appendChild(script);
+
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             allResults = [];
             isRunning = true;
-
-            await collectData(key, city, searchKeywords, maxPages, citylimit);
         }
 
-        async function collectData(key, city, keywords, maxPages, citylimit) {
-            const corsProxy = 'https://api.allorigins.win/raw?url=';
-            const baseUrl = 'https://restapi.amap.com/v3/place/text';
+        function doSearch(city, keywords, maxPages, citylimit) {
+            placeSearch = new AMap.PlaceSearch({
+                city: city,
+                citylimit: citylimit,
+                pageSize: 20,
+                pageIndex: 1,
+                extensions: 'all'
+            });
 
-            try {
-                for (let page = 1; page <= maxPages; page++) {
-                    if (!isRunning) break;
+            let currentPage = 1;
 
-                    document.getElementById('progressInfo').textContent = `正在采集第 ${page} 页...`;
+            function searchPage() {
+                if (!isRunning) return;
 
-                    const params = new URLSearchParams({
-                        key: key,
-                        keywords: keywords,
-                        city: city,
-                        citylimit: citylimit ? 'true' : 'false',
-                        offset: '20',
-                        page: page.toString(),
-                        extensions: 'all',
-                        output: 'json'
-                    });
+                document.getElementById('progressInfo').textContent = `正在采集第 ${currentPage} 页...`;
 
-                    const url = corsProxy + encodeURIComponent(baseUrl + '?' + params.toString());
-                    
-                    const resp = await fetch(url);
-                    const data = await resp.json();
+                placeSearch.search(keywords, function(status, result) {
+                    if (!isRunning) return;
 
-                    if (data.status !== '1') {
-                        document.getElementById('progressInfo').textContent = `错误: ${data.info}`;
-                        break;
-                    }
+                    if (status === 'complete') {
+                        const pois = result.poiList.pois;
+                        const total = result.poiList.count;
 
-                    if (page === 1) {
-                        const total = parseInt(data.count);
-                        document.getElementById('progressInfo').textContent = `搜索到共 ${total} 条结果`;
-                    }
-
-                    const pois = data.pois || [];
-                    if (pois.length === 0) {
-                        document.getElementById('progressInfo').textContent = '没有更多数据了';
-                        break;
-                    }
-
-                    pois.forEach(poi => {
-                        allResults.push({
-                            '商家名称': poi.name || '',
-                            '地址': poi.address || '',
-                            '电话': poi.tel || '',
-                            '类目': poi.type || '',
-                            '省份': poi.pname || '',
-                            '城市': poi.cityname || '',
-                            '区域': poi.adname || '',
-                            '经度': poi.longitude || '',
-                            '纬度': poi.latitude || ''
+                        pois.forEach(poi => {
+                            allResults.push({
+                                '商家名称': poi.name || '',
+                                '地址': poi.address || '',
+                                '电话': poi.tel || '',
+                                '类目': poi.type || '',
+                                '省份': poi.pname || '',
+                                '城市': poi.cityname || '',
+                                '区域': poi.adname || '',
+                                '经度': poi.location ? poi.location.lng : '',
+                                '纬度': poi.location ? poi.location.lat : ''
+                            });
                         });
-                    });
 
-                    updateStats();
-                    renderTable();
+                        updateStats();
+                        renderTable();
 
-                    await sleep(500);
-                }
-            } catch (error) {
-                document.getElementById('progressInfo').textContent = `采集出错: ${error.message}`;
-            } finally {
-                finish();
+                        currentPage++;
+                        if (currentPage <= maxPages && allResults.length < total) {
+                            document.getElementById('progressInfo').textContent = `已采集 ${allResults.length} / ${total} 条，继续下一页...`;
+                            placeSearch.setPageIndex(currentPage);
+                            setTimeout(searchPage, 500);
+                        } else {
+                            finish();
+                        }
+                    } else {
+                        document.getElementById('progressInfo').textContent = `搜索出错: ${status}`;
+                        finish();
+                    }
+                });
             }
-        }
 
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+            searchPage();
         }
 
         function stopSearch() {
             isRunning = false;
             document.getElementById('progressInfo').textContent = '已手动停止';
+            finish();
         }
 
         function finish() {
