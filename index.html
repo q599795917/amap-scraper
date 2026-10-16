@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高德地图商家采集工具</title>
+    <title>高德商家采集工具</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,31 +33,30 @@
         .stat-num { font-size: 24px; font-weight: bold; color: #1890ff; }
         .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
         .download-btns { display: flex; gap: 10px; margin-top: 15px; }
-        .tips { background: #fffbe6; border: 1px solid #ffe58f; padding: 12px; border-radius: 6px; font-size: 13px; color: #ad6800; margin-top: 15px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>高德地图商家信息采集工具</h1>
+            <h1>高德商家采集工具</h1>
         </div>
 
         <div class="card">
             <div class="form-grid">
                 <div class="form-item full-width">
-                    <label>高德API Key（Web服务类型）</label>
-                    <input type="text" id="apiKey" placeholder="请输入Web服务类型的Key（你叫22的那个）">
+                    <label>API Key</label>
+                    <input type="text" id="apiKey" placeholder="请输入你的高德API Key">
                 </div>
                 <div class="form-item">
                     <label>省份</label>
                     <select id="province" onchange="onProvinceChange()">
-                        <option value="">-- 请先加载省市区 --</option>
+                        <option value="">-- 请选择 --</option>
                     </select>
                 </div>
                 <div class="form-item">
                     <label>城市</label>
                     <select id="city" onchange="onCityChange()">
-                        <option value="">-- 请选择省份 --</option>
+                        <option value="">-- 请选择 --</option>
                     </select>
                 </div>
                 <div class="form-item">
@@ -84,7 +83,7 @@
             </div>
 
             <div class="btn-group">
-                <button class="btn-primary" id="startBtn" onclick="startSearch()" disabled>开始采集</button>
+                <button class="btn-primary" id="startBtn" onclick="startSearch()">开始采集</button>
                 <button class="btn-warning" id="stopBtn" onclick="stopSearch()" disabled>停止</button>
             </div>
 
@@ -108,16 +107,6 @@
             <div class="download-btns" id="downloadBtns" style="display: none;">
                 <button class="btn-success" onclick="downloadExcel()">下载 Excel</button>
                 <button class="btn-success" onclick="downloadCSV()">下载 CSV</button>
-            </div>
-
-            <div class="tips">
-                <strong>使用说明：</strong><br>
-                1. 输入Web服务类型的Key，点击「加载省市区数据」按钮<br>
-                2. 选择省、市、区县，输入关键词，点击开始采集<br>
-                3. 采集完成后点击下载按钮导出结果
-            </div>
-            <div style="margin-top: 10px;">
-                <button class="btn-primary" onclick="loadRegions()" style="padding: 8px 16px; font-size: 14px;">加载省市区数据</button>
             </div>
         </div>
 
@@ -164,17 +153,13 @@
             });
         }
 
-        async function loadRegions() {
-            const key = document.getElementById('apiKey').value.trim();
-            if (!key) { alert('请先输入Web服务类型的Key'); return; }
-
-            alert('正在加载全国省市区数据...');
-
+        // 输入Key后自动加载省份
+        document.getElementById('apiKey').addEventListener('blur', async function() {
+            const key = this.value.trim();
+            if (!key) return;
             try {
-                // 加载全国省份
                 const provinceData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=中国&subdistrict=1`);
                 const provinceList = provinceData.districts[0].districts;
-                
                 const provinceSelect = document.getElementById('province');
                 provinceSelect.innerHTML = '<option value="">-- 请选择 --</option>';
                 provinceList.forEach(p => {
@@ -183,13 +168,10 @@
                     option.textContent = p.name;
                     provinceSelect.appendChild(option);
                 });
-
-                document.getElementById('startBtn').disabled = false;
-                alert('省市区数据加载成功！请选择省份');
             } catch (e) {
-                alert('加载省市区失败: ' + e.message);
+                // 静默失败
             }
-        }
+        });
 
         async function onProvinceChange() {
             const provinceName = document.getElementById('province').value;
@@ -205,7 +187,6 @@
             try {
                 const cityData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=${encodeURIComponent(provinceName)}&subdistrict=1`);
                 const cityList = cityData.districts[0].districts;
-                
                 cityList.forEach(c => {
                     const option = document.createElement('option');
                     option.value = c.name;
@@ -213,7 +194,7 @@
                     citySelect.appendChild(option);
                 });
             } catch (e) {
-                alert('加载城市失败: ' + e.message);
+                alert('加载城市失败');
             }
         }
 
@@ -229,7 +210,6 @@
             try {
                 const districtData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=${encodeURIComponent(cityName)}&subdistrict=1`);
                 const districtList = districtData.districts[0].districts;
-                
                 districtList.forEach(d => {
                     const option = document.createElement('option');
                     option.value = d.name;
@@ -237,7 +217,7 @@
                     districtSelect.appendChild(option);
                 });
             } catch (e) {
-                alert('加载区县失败: ' + e.message);
+                alert('加载区县失败');
             }
         }
 
@@ -249,7 +229,7 @@
             const maxPages = parseInt(document.getElementById('maxPages').value);
             const citylimit = document.getElementById('citylimit').value === 'true';
 
-            if (!key) { alert('请输入Web服务类型的API Key'); return; }
+            if (!key) { alert('请输入API Key'); return; }
             if (!city) { alert('请选择城市'); return; }
             if (!keywords) { alert('请输入搜索关键词'); return; }
 
@@ -275,7 +255,7 @@
                     const data = await jsonpRequest(apiUrl);
 
                     if (data.status !== '1') {
-                        alert(`API错误: ${data.info} (状态码: ${data.infocode})`);
+                        alert(`错误: ${data.info}`);
                         break;
                     }
 
