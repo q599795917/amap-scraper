@@ -67,7 +67,7 @@
                 </div>
                 <div class="form-item">
                     <label>搜索关键词</label>
-                    <input type="text" id="keywords" value="美食" placeholder="如：美食、酒店">
+                    <input type="text" id="keywords" placeholder="如：美食、酒店">
                 </div>
                 <div class="form-item">
                     <label>最大采集页数</label>
@@ -134,6 +134,30 @@
         let allResults = [];
         let isRunning = false;
         let callbackIndex = 0;
+        let seenIds = new Set();
+
+        window.onload = function() {
+            const savedKey = localStorage.getItem('amap_key');
+            const savedKeywords = localStorage.getItem('amap_keywords');
+            const savedMaxPages = localStorage.getItem('amap_maxPages');
+            const savedCitylimit = localStorage.getItem('amap_citylimit');
+            
+            if (savedKey) document.getElementById('apiKey').value = savedKey;
+            if (savedKeywords) document.getElementById('keywords').value = savedKeywords;
+            if (savedMaxPages) document.getElementById('maxPages').value = savedMaxPages;
+            if (savedCitylimit) document.getElementById('citylimit').value = savedCitylimit;
+            
+            if (savedKey) {
+                document.getElementById('apiKey').dispatchEvent(new Event('blur'));
+            }
+        };
+
+        function saveSettings() {
+            localStorage.setItem('amap_key', document.getElementById('apiKey').value.trim());
+            localStorage.setItem('amap_keywords', document.getElementById('keywords').value.trim());
+            localStorage.setItem('amap_maxPages', document.getElementById('maxPages').value);
+            localStorage.setItem('amap_citylimit', document.getElementById('citylimit').value);
+        }
 
         function jsonpRequest(url) {
             return new Promise((resolve, reject) => {
@@ -153,7 +177,6 @@
             });
         }
 
-        // 输入Key后自动加载省份
         document.getElementById('apiKey').addEventListener('blur', async function() {
             const key = this.value.trim();
             if (!key) return;
@@ -169,7 +192,6 @@
                     provinceSelect.appendChild(option);
                 });
             } catch (e) {
-                // 静默失败
             }
         });
 
@@ -233,6 +255,8 @@
             if (!city) { alert('请选择城市'); return; }
             if (!keywords) { alert('请输入搜索关键词'); return; }
 
+            saveSettings();
+
             let searchKeywords = keywords;
             if (district) {
                 searchKeywords = `${district} ${keywords}`;
@@ -241,6 +265,7 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             allResults = [];
+            seenIds = new Set();
             isRunning = true;
 
             try {
@@ -263,6 +288,9 @@
                     const pois = data.pois || [];
 
                     pois.forEach(poi => {
+                        if (poi.id && seenIds.has(poi.id)) return;
+                        if (poi.id) seenIds.add(poi.id);
+
                         allResults.push({
                             '商家名称': poi.name || '',
                             '地址': poi.address || '',
