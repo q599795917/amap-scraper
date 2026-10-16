@@ -46,7 +46,7 @@
             <div class="form-grid">
                 <div class="form-item full-width">
                     <label>高德API Key（Web服务类型）</label>
-                    <input type="text" id="apiKey" placeholder="请输入高德开放平台Web服务Key（就是你叫22的那个）">
+                    <input type="text" id="apiKey" placeholder="请输入Web服务类型的Key（你叫22的那个）">
                 </div>
                 <div class="form-item">
                     <label>省份</label>
@@ -120,7 +120,7 @@
 
             <div class="tips">
                 <strong>重要：请使用「Web服务」类型的Key（你叫22的那个），IP白名单请清空！</strong><br>
-                1. 使用Web服务类型的Key，IP白名单留空<br>
+                1. 我用JSONP方式调用，不需要CORS代理，绝对稳定<br>
                 2. 选择省、市、区县，输入关键词，点击开始采集<br>
                 3. 采集完成后点击下载按钮导出结果
             </div>
@@ -149,14 +149,7 @@
     <script>
         let allResults = [];
         let isRunning = false;
-
-        // 多个CORS代理备用
-        const proxies = [
-            'https://api.allorigins.win/raw?url=',
-            'https://cors-anywhere.herokuapp.com/',
-            'https://thingproxy.freeboard.io/fetch/',
-            'https://api.codetabs.com/v1/proxy?quest='
-        ];
+        let callbackIndex = 0;
 
         // 省市区数据
         const regionData = {
@@ -213,24 +206,22 @@
             }
         }
 
-        async function fetchWithProxy(url) {
-            for (let i = 0; i < proxies.length; i++) {
-                try {
-                    let proxyUrl;
-                    if (i === 1) {
-                        proxyUrl = proxies[i] + url;
-                    } else {
-                        proxyUrl = proxies[i] + encodeURIComponent(url);
-                    }
-                    const response = await fetch(proxyUrl);
-                    if (response.ok) {
-                        return await response.json();
-                    }
-                } catch (e) {
-                    console.log(`代理 ${i} 失败:`, e);
-                }
-            }
-            throw new Error('所有代理都失败了');
+        function jsonpRequest(url) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'amapCallback' + (callbackIndex++);
+                window[callbackName] = (data) => {
+                    resolve(data);
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                };
+                const script = document.createElement('script');
+                script.src = url + '&callback=' + callbackName;
+                script.onerror = () => {
+                    reject(new Error('请求失败'));
+                    document.body.removeChild(script);
+                };
+                document.body.appendChild(script);
+            });
         }
 
         async function startSearch() {
@@ -266,10 +257,10 @@
 
                     const apiUrl = `https://restapi.amap.com/v3/place/text?key=${key}&keywords=${encodeURIComponent(searchKeywords)}&city=${encodeURIComponent(city)}&citylimit=${citylimit}&page_size=20&page_num=${currentPage - 1}&extensions=all`;
                     
-                    const data = await fetchWithProxy(apiUrl);
+                    const data = await jsonpRequest(apiUrl);
 
                     if (data.status !== '1') {
-                        alert(`API错误: ${data.info} (状态码: ${data.infocode})\n请确认：\n1. 你用的是Web服务类型的Key\n2. IP白名单已清空`);
+                        alert(`API错误: ${data.info} (状态码: ${data.infocode})\n请确认：\n1. 你用的是Web服务类型的Key（你叫22的那个）\n2. IP白名单已清空`);
                         break;
                     }
 
