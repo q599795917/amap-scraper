@@ -222,11 +222,18 @@
                 searchKeywords = `${district} ${keywords}`;
             }
 
+            alert('正在加载高德SDK...\nKey: ' + key + '\n城市: ' + city + '\n关键词: ' + searchKeywords);
+
             // 加载JS API
             const script = document.createElement('script');
             script.src = `https://webapi.amap.com/maps?v=2.0&key=${key}&plugin=AMap.PlaceSearch`;
-            script.onload = () => doSearch(city, searchKeywords, maxPages, citylimit);
-            script.onerror = () => alert('Key加载失败，请检查Key是否正确，以及域名白名单是否包含 q599795917.github.io');
+            script.onload = () => {
+                alert('SDK加载成功，开始搜索...');
+                doSearch(city, searchKeywords, maxPages, citylimit);
+            };
+            script.onerror = () => {
+                alert('SDK加载失败！\n可能原因：\n1. Key不正确\n2. 域名白名单未配置 q599795917.github.io\n3. Key类型不是Web端JS API');
+            };
             document.head.appendChild(script);
 
             document.getElementById('startBtn').disabled = true;
@@ -236,13 +243,19 @@
         }
 
         function doSearch(city, keywords, maxPages, citylimit) {
-            placeSearch = new AMap.PlaceSearch({
-                city: city,
-                citylimit: citylimit,
-                pageSize: 20,
-                pageIndex: 1,
-                extensions: 'all'
-            });
+            try {
+                placeSearch = new AMap.PlaceSearch({
+                    city: city,
+                    citylimit: citylimit,
+                    pageSize: 20,
+                    pageIndex: 1,
+                    extensions: 'all'
+                });
+            } catch (e) {
+                alert('创建搜索对象失败: ' + e.message);
+                finish();
+                return;
+            }
 
             let currentPage = 1;
 
@@ -257,6 +270,8 @@
                     if (status === 'complete') {
                         const pois = result.poiList.pois;
                         const total = result.poiList.count;
+
+                        alert(`搜索成功！共${total}条，本页${pois.length}条`);
 
                         pois.forEach(poi => {
                             allResults.push({
@@ -284,7 +299,7 @@
                             finish();
                         }
                     } else {
-                        document.getElementById('progressInfo').textContent = `搜索出错: ${status}`;
+                        alert(`搜索失败！状态: ${status}\n${JSON.stringify(result)}`);
                         finish();
                     }
                 });
