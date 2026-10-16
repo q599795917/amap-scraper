@@ -46,13 +46,13 @@
             <div class="form-grid">
                 <div class="form-item full-width">
                     <label>高德API Key（Web端JS API）</label>
-                    <input type="text" id="apiKey" placeholder="请输入高德开放平台JS API Key">
+                    <input type="text" id="apiKey" value="de7652d2bd7f3019775d6019d1b0e4a5" placeholder="请输入高德开放平台JS API Key">
                 </div>
                 <div class="form-item">
                     <label>省份</label>
                     <select id="province" onchange="onProvinceChange()">
                         <option value="">-- 请选择 --</option>
-                        <option value="福建省">福建省</option>
+                        <option value="福建省" selected>福建省</option>
                         <option value="浙江省">浙江省</option>
                         <option value="广东省">广东省</option>
                         <option value="江苏省">江苏省</option>
@@ -64,12 +64,14 @@
                     <label>城市</label>
                     <select id="city" onchange="onCityChange()">
                         <option value="">-- 请选择 --</option>
+                        <option value="泉州市" selected>泉州市</option>
                     </select>
                 </div>
                 <div class="form-item">
                     <label>区县（可选）</label>
                     <select id="district">
                         <option value="">-- 全部 --</option>
+                        <option value="丰泽区" selected>丰泽区</option>
                     </select>
                 </div>
                 <div class="form-item">
