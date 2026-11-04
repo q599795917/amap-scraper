@@ -29,6 +29,12 @@
         .status { font-size: 13px; margin-top: 8px; min-height: 18px; color: #666; }
         .status.ok { color: #52c41a; }
         .status.err { color: #ff4d4f; }
+        .key-help { margin-top: 10px; font-size: 13px; color: #888; }
+        .key-help a { color: #1890ff; text-decoration: none; }
+        .key-help a:hover { text-decoration: underline; }
+        .key-help details { margin-top: 6px; }
+        .key-help summary { cursor: pointer; color: #1890ff; }
+        .key-help .steps { margin-top: 6px; line-height: 1.9; color: #777; }
         .progress-info { text-align: center; color: #666; margin: 15px 0; font-size: 14px; }
         .result-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         .result-table th, .result-table td { border: 1px solid #eee; padding: 8px 10px; text-align: left; }
@@ -56,6 +62,18 @@
                         <button class="btn-load" id="loadBtn" onclick="loadProvinces()">加载地区</button>
                     </div>
                     <div class="status" id="regionStatus">输入 Key 后点右侧「加载地区」</div>
+                    <div class="key-help">
+                        没有 Key？<a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">去高德开放平台申请</a>
+                        <details>
+                            <summary>创建步骤</summary>
+                            <div class="steps">
+                                1. 打开高德开放平台，登录或注册账号<br>
+                                2. 进入控制台 → 应用管理 → 创建新应用<br>
+                                3. 点「添加 Key」，服务平台选「Web服务」，IP 白名单留空<br>
+                                4. 复制生成的 Key，粘贴到上面的输入框
+                            </div>
+                        </details>
+                    </div>
                 </div>
                 <div class="form-item">
                     <label>省份</label>
