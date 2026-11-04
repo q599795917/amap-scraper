@@ -14,15 +14,21 @@
         .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         .form-item label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
-        .form-item input, .form-item select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        .form-item input:focus { outline: none; border-color: #1890ff; }
+        .form-item input, .form-item select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; }
+        .form-item input:focus, .form-item select:focus { outline: none; border-color: #1890ff; }
         .full-width { grid-column: 1 / -1; }
+        .key-row { display: flex; gap: 10px; }
+        .key-row input { flex: 1; }
         .btn-group { display: flex; gap: 10px; }
         button { padding: 12px 24px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: 500; }
         .btn-primary { background: #1890ff; color: white; }
         .btn-success { background: #52c41a; color: white; }
         .btn-warning { background: #faad14; color: white; }
+        .btn-load { background: #1890ff; color: white; padding: 10px 18px; font-size: 14px; white-space: nowrap; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status { font-size: 13px; margin-top: 8px; min-height: 18px; color: #666; }
+        .status.ok { color: #52c41a; }
+        .status.err { color: #ff4d4f; }
         .progress-info { text-align: center; color: #666; margin: 15px 0; font-size: 14px; }
         .result-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         .result-table th, .result-table td { border: 1px solid #eee; padding: 8px 10px; text-align: left; }
@@ -45,18 +51,22 @@
             <div class="form-grid">
                 <div class="form-item full-width">
                     <label>API Key</label>
-                    <input type="text" id="apiKey" placeholder="请输入你的高德API Key">
+                    <div class="key-row">
+                        <input type="text" id="apiKey" placeholder="请输入你的高德API Key">
+                        <button class="btn-load" id="loadBtn" onclick="loadProvinces()">加载地区</button>
+                    </div>
+                    <div class="status" id="regionStatus">输入 Key 后点右侧「加载地区」</div>
                 </div>
                 <div class="form-item">
                     <label>省份</label>
                     <select id="province" onchange="onProvinceChange()">
-                        <option value="">-- 请选择 --</option>
+                        <option value="">-- 请先加载地区 --</option>
                     </select>
                 </div>
                 <div class="form-item">
                     <label>城市</label>
                     <select id="city" onchange="onCityChange()">
-                        <option value="">-- 请选择 --</option>
+                        <option value="">-- 请选择省份 --</option>
                     </select>
                 </div>
                 <div class="form-item">
@@ -136,20 +146,24 @@
         let callbackIndex = 0;
         let seenIds = new Set();
 
+        function setRegionStatus(text, type) {
+            const el = document.getElementById('regionStatus');
+            el.textContent = text;
+            el.className = 'status' + (type ? ' ' + type : '');
+        }
+
         window.onload = function() {
             const savedKey = localStorage.getItem('amap_key');
             const savedKeywords = localStorage.getItem('amap_keywords');
             const savedMaxPages = localStorage.getItem('amap_maxPages');
             const savedCitylimit = localStorage.getItem('amap_citylimit');
-            
+
             if (savedKey) document.getElementById('apiKey').value = savedKey;
             if (savedKeywords) document.getElementById('keywords').value = savedKeywords;
             if (savedMaxPages) document.getElementById('maxPages').value = savedMaxPages;
             if (savedCitylimit) document.getElementById('citylimit').value = savedCitylimit;
-            
-            if (savedKey) {
-                document.getElementById('apiKey').dispatchEvent(new Event('blur'));
-            }
+
+            if (savedKey) loadProvinces(true);
         };
 
         function saveSettings() {
@@ -162,84 +176,146 @@
         function jsonpRequest(url) {
             return new Promise((resolve, reject) => {
                 const callbackName = 'amapCallback' + (callbackIndex++);
-                window[callbackName] = (data) => {
-                    resolve(data);
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                };
                 const script = document.createElement('script');
+                let done = false;
+
+                function cleanup() {
+                    delete window[callbackName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                const timer = setTimeout(() => {
+                    if (done) return;
+                    done = true;
+                    cleanup();
+                    reject(new Error('请求超时，请检查网络或 Key 是否有效'));
+                }, 12000);
+
+                window[callbackName] = (data) => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    cleanup();
+                    resolve(data);
+                };
+
                 script.src = url + '&callback=' + callbackName;
                 script.onerror = () => {
-                    reject(new Error('请求失败'));
-                    document.body.removeChild(script);
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    cleanup();
+                    reject(new Error('请求失败，请检查网络连接'));
                 };
                 document.body.appendChild(script);
             });
         }
 
-        document.getElementById('apiKey').addEventListener('blur', async function() {
-            const key = this.value.trim();
-            if (!key) return;
-            try {
-                const provinceData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=中国&subdistrict=1`);
-                const provinceList = provinceData.districts[0].districts;
-                const provinceSelect = document.getElementById('province');
-                provinceSelect.innerHTML = '<option value="">-- 请选择 --</option>';
-                provinceList.forEach(p => {
-                    const option = document.createElement('option');
-                    option.value = p.name;
-                    option.textContent = p.name;
-                    provinceSelect.appendChild(option);
-                });
-            } catch (e) {
+        function fillSelect(selectId, items, placeholder) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '';
+            const first = document.createElement('option');
+            first.value = '';
+            first.textContent = placeholder;
+            select.appendChild(first);
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.name;
+                option.textContent = item.name;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadProvinces(silent) {
+            const key = document.getElementById('apiKey').value.trim();
+            if (!key) {
+                setRegionStatus('请先输入 API Key', 'err');
+                return;
             }
-        });
+
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+            setRegionStatus('正在加载省份列表...');
+
+            try {
+                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent('中国') + '&subdistrict=1');
+
+                if (data.status !== '1') {
+                    setRegionStatus('加载失败：' + data.info + '（错误码 ' + data.infocode + '）', 'err');
+                    return;
+                }
+
+                const provinces = (data.districts && data.districts[0] && data.districts[0].districts) || [];
+                if (!provinces.length) {
+                    setRegionStatus('加载失败：返回省份为空，请确认 Key 为「Web服务」类型', 'err');
+                    return;
+                }
+
+                fillSelect('province', provinces, '-- 请选择省份 --');
+                fillSelect('city', [], '-- 请选择省份 --');
+                fillSelect('district', [], '-- 全部 --');
+                setRegionStatus('已加载 ' + provinces.length + ' 个省份，请选择省份', 'ok');
+                saveSettings();
+            } catch (e) {
+                setRegionStatus('加载失败：' + e.message, 'err');
+            } finally {
+                btn.disabled = false;
+            }
+        }
 
         async function onProvinceChange() {
             const provinceName = document.getElementById('province').value;
-            const citySelect = document.getElementById('city');
-            const districtSelect = document.getElementById('district');
-            
-            citySelect.innerHTML = '<option value="">-- 请选择 --</option>';
-            districtSelect.innerHTML = '<option value="">-- 全部 --</option>';
-
-            if (!provinceName) return;
-
             const key = document.getElementById('apiKey').value.trim();
+
+            fillSelect('city', [], '-- 请选择城市 --');
+            fillSelect('district', [], '-- 全部 --');
+
+            if (!provinceName) {
+                setRegionStatus('请选择省份');
+                return;
+            }
+
+            setRegionStatus('正在加载 ' + provinceName + ' 的城市...');
+
             try {
-                const cityData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=${encodeURIComponent(provinceName)}&subdistrict=1`);
-                const cityList = cityData.districts[0].districts;
-                cityList.forEach(c => {
-                    const option = document.createElement('option');
-                    option.value = c.name;
-                    option.textContent = c.name;
-                    citySelect.appendChild(option);
-                });
+                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent(provinceName) + '&subdistrict=1');
+
+                if (data.status !== '1') {
+                    setRegionStatus('加载城市失败：' + data.info, 'err');
+                    return;
+                }
+
+                const cities = (data.districts && data.districts[0] && data.districts[0].districts) || [];
+                fillSelect('city', cities, '-- 请选择城市 --');
+                setRegionStatus('已加载 ' + cities.length + ' 个城市，请选择城市', 'ok');
             } catch (e) {
-                alert('加载城市失败');
+                setRegionStatus('加载城市失败：' + e.message, 'err');
             }
         }
 
         async function onCityChange() {
             const cityName = document.getElementById('city').value;
-            const districtSelect = document.getElementById('district');
-            
-            districtSelect.innerHTML = '<option value="">-- 全部 --</option>';
+            const key = document.getElementById('apiKey').value.trim();
+
+            fillSelect('district', [], '-- 全部 --');
 
             if (!cityName) return;
 
-            const key = document.getElementById('apiKey').value.trim();
+            setRegionStatus('正在加载 ' + cityName + ' 的区县...');
+
             try {
-                const districtData = await jsonpRequest(`https://restapi.amap.com/v3/config/district?key=${key}&keywords=${encodeURIComponent(cityName)}&subdistrict=1`);
-                const districtList = districtData.districts[0].districts;
-                districtList.forEach(d => {
-                    const option = document.createElement('option');
-                    option.value = d.name;
-                    option.textContent = d.name;
-                    districtSelect.appendChild(option);
-                });
+                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent(cityName) + '&subdistrict=1');
+
+                if (data.status !== '1') {
+                    setRegionStatus('加载区县失败：' + data.info, 'err');
+                    return;
+                }
+
+                const districts = (data.districts && data.districts[0] && data.districts[0].districts) || [];
+                fillSelect('district', districts, '-- 全部 --');
+                setRegionStatus('已加载 ' + districts.length + ' 个区县', 'ok');
             } catch (e) {
-                alert('加载区县失败');
+                setRegionStatus('加载区县失败：' + e.message, 'err');
             }
         }
 
@@ -248,7 +324,7 @@
             const city = document.getElementById('city').value;
             const district = document.getElementById('district').value;
             const keywords = document.getElementById('keywords').value.trim();
-            const maxPages = parseInt(document.getElementById('maxPages').value);
+            const maxPages = parseInt(document.getElementById('maxPages').value, 10);
             const citylimit = document.getElementById('citylimit').value === 'true';
 
             if (!key) { alert('请输入API Key'); return; }
@@ -259,7 +335,7 @@
 
             let searchKeywords = keywords;
             if (district) {
-                searchKeywords = `${district} ${keywords}`;
+                searchKeywords = district + ' ' + keywords;
             }
 
             document.getElementById('startBtn').disabled = true;
@@ -273,21 +349,22 @@
                 let total = 0;
 
                 while (isRunning && currentPage <= maxPages) {
-                    document.getElementById('progressInfo').textContent = `正在采集第 ${currentPage} 页...`;
+                    document.getElementById('progressInfo').textContent = '正在采集第 ' + currentPage + ' 页...';
 
-                    const apiUrl = `https://restapi.amap.com/v3/place/text?key=${key}&keywords=${encodeURIComponent(searchKeywords)}&city=${encodeURIComponent(city)}&citylimit=${citylimit}&page_size=20&page_num=${currentPage - 1}&extensions=all`;
-                    
+                    const apiUrl = 'https://restapi.amap.com/v3/place/text?key=' + key + '&keywords=' + encodeURIComponent(searchKeywords) + '&city=' + encodeURIComponent(city) + '&citylimit=' + citylimit + '&page_size=20&page_num=' + (currentPage - 1) + '&extensions=all';
+
                     const data = await jsonpRequest(apiUrl);
 
                     if (data.status !== '1') {
-                        alert(`错误: ${data.info}`);
+                        alert('错误：' + data.info);
                         break;
                     }
 
-                    total = data.count;
+                    total = parseInt(data.count, 10) || 0;
                     const pois = data.pois || [];
 
                     pois.forEach(poi => {
+                        if (typeof poi === 'string') return;
                         if (poi.id && seenIds.has(poi.id)) return;
                         if (poi.id) seenIds.add(poi.id);
 
@@ -309,12 +386,13 @@
 
                     if (allResults.length >= total || pois.length === 0) break;
                     currentPage++;
+                    document.getElementById('progressInfo').textContent = '已采集 ' + allResults.length + ' / ' + total + ' 条';
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
 
                 finish();
             } catch (e) {
-                alert(`出错了: ${e.message}`);
+                alert('出错了：' + e.message);
                 finish();
             }
         }
@@ -329,7 +407,8 @@
             isRunning = false;
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
-            document.getElementById('progressInfo').textContent = `采集完成！共 ${allResults.length} 条`;
+            const hasPhone = allResults.filter(r => r['电话'] && r['电话'] !== '[]').length;
+            document.getElementById('progressInfo').textContent = '采集完成！共 ' + allResults.length + ' 条（含电话 ' + hasPhone + ' 条）';
             document.getElementById('downloadBtns').style.display = 'flex';
             document.getElementById('resultCard').style.display = 'block';
         }
@@ -347,14 +426,12 @@
             tbody.innerHTML = '';
             allResults.slice(0, 50).forEach((item, idx) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${idx + 1}</td>
-                    <td>${item['商家名称']}</td>
-                    <td>${item['地址']}</td>
-                    <td>${item['电话']}</td>
-                    <td>${item['类目']}</td>
-                    <td>${item['区域']}</td>
-                `;
+                const cells = [idx + 1, item['商家名称'], item['地址'], item['电话'], item['类目'], item['区域']];
+                cells.forEach(value => {
+                    const td = document.createElement('td');
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
                 tbody.appendChild(tr);
             });
         }
@@ -362,22 +439,22 @@
         function downloadExcel() {
             const ws = XLSX.utils.json_to_sheet(allResults);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "商家数据");
-            const timestamp = new Date().toISOString().slice(0,10);
-            XLSX.writeFile(wb, `高德商家_${timestamp}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, '商家数据');
+            const timestamp = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, '高德商家_' + timestamp + '.xlsx');
         }
 
         function downloadCSV() {
             const headers = Object.keys(allResults[0]);
             let csv = headers.join(',') + '\n';
             allResults.forEach(row => {
-                csv += headers.map(h => `"${(row[h] || '').toString().replace(/"/g, '""')}"`).join(',') + '\n';
+                csv += headers.map(h => '"' + String(row[h] || '').replace(/"/g, '""') + '"').join(',') + '\n';
             });
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `高德商家_${new Date().toISOString().slice(0,10)}.csv`;
+            a.download = '高德商家_' + new Date().toISOString().slice(0, 10) + '.csv';
             a.click();
         }
     </script>
