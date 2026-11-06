@@ -1,555 +1,413 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高德商家采集工具</title>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: "Microsoft YaHei", sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 25px; }
-        .header h1 { color: #333; font-size: 26px; }
-        .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .form-item label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
-        .form-item input, .form-item select, .form-item textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; font-family: inherit; }
-        .form-item textarea { resize: vertical; }
-        .form-item input:focus, .form-item select:focus, .form-item textarea:focus { outline: none; border-color: #1890ff; }
-        .full-width { grid-column: 1 / -1; }
-        .key-row { display: flex; gap: 10px; }
-        .key-row input { flex: 1; }
-        .btn-group { display: flex; gap: 10px; }
-        button { padding: 12px 24px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: 500; }
-        .btn-primary { background: #1890ff; color: white; }
-        .btn-success { background: #52c41a; color: white; }
-        .btn-warning { background: #faad14; color: white; }
-        .btn-load { background: #1890ff; color: white; padding: 10px 18px; font-size: 14px; white-space: nowrap; }
-        .btn-add { background: #fff; color: #1890ff; border: 1px solid #1890ff; padding: 8px 16px; font-size: 13px; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .status { font-size: 13px; margin-top: 8px; min-height: 18px; color: #666; }
-        .status.ok { color: #52c41a; }
-        .status.err { color: #ff4d4f; }
-        .key-help { margin-top: 10px; font-size: 13px; color: #888; }
-        .key-help a { color: #1890ff; text-decoration: none; }
-        .key-help a:hover { text-decoration: underline; }
-        .key-help details { margin-top: 6px; }
-        .key-help summary { cursor: pointer; color: #1890ff; }
-        .key-help .steps { margin-top: 6px; line-height: 1.9; color: #777; }
-        .region-chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
-        .chip { background: #e6f4ff; color: #1890ff; border: 1px solid #91caff; padding: 4px 10px; border-radius: 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
-        .chip .x { cursor: pointer; font-weight: bold; color: #ff4d4f; }
-        .region-empty { font-size: 13px; color: #999; }
-        .progress-info { text-align: center; color: #666; margin: 15px 0; font-size: 14px; }
-        .result-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        .result-table th, .result-table td { border: 1px solid #eee; padding: 8px 10px; text-align: left; }
-        .result-table th { background: #fafafa; font-weight: 600; }
-        .result-table tr:hover { background: #f5f5f5; }
-        .stats { display: flex; justify-content: space-around; margin: 15px 0; padding: 15px; background: #f0f7ff; border-radius: 8px; }
-        .stat-item { text-align: center; }
-        .stat-num { font-size: 24px; font-weight: bold; color: #1890ff; }
-        .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
-        .download-btns { display: flex; gap: 10px; margin-top: 15px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高德商家采集工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+        --bg:#0b1120; --bg2:#0f1a30; --card:#111c33; --border:#1f2c4a;
+        --txt:#e6edf7; --sub:#8b9bb8; --accent:#3b82f6; --accent2:#22d3ee;
+        --ok:#34d399; --err:#f87171;
+    }
+    body{font-family:"Microsoft YaHei",system-ui,sans-serif;min-height:100vh;color:var(--txt);
+        background:radial-gradient(1200px 600px at 70% -10%,#1b2a52 0%,var(--bg) 55%) fixed;}
+    #gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;}
+    .gate-card{width:100%;max-width:400px;background:rgba(17,28,51,.85);backdrop-filter:blur(12px);
+        border:1px solid var(--border);border-radius:18px;padding:38px 32px;
+        box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px rgba(59,130,246,.15) inset;}
+    .gate-logo{width:56px;height:56px;border-radius:14px;margin:0 auto 16px;
+        background:linear-gradient(135deg,var(--accent),var(--accent2));
+        display:flex;align-items:center;justify-content:center;font-size:28px;}
+    .gate-card h1{text-align:center;font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:1px}
+    .gate-sub{text-align:center;color:var(--sub);font-size:13px;margin-bottom:28px}
+    .field label{display:block;font-size:13px;color:var(--sub);margin-bottom:8px}
+    .field input{width:100%;padding:13px 14px;background:#0b1428;border:1px solid var(--border);
+        border-radius:10px;color:var(--txt);font-size:15px;letter-spacing:2px;outline:none;transition:.2s}
+    .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+    .btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:600;
+        cursor:pointer;background:linear-gradient(135deg,var(--accent),#2563eb);color:#fff;transition:.2s}
+    .btn:hover{filter:brightness(1.1)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .gate-status{min-height:20px;margin-top:14px;font-size:13px;text-align:center}
+    .gate-status.err{color:var(--err)} .gate-status.ok{color:var(--ok)}
+    .gate-foot{margin-top:18px;text-align:center;font-size:12px;color:#5a6b8c}
+    #main{display:none;max-width:1080px;margin:0 auto;padding:20px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand .dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+        display:flex;align-items:center;justify-content:center;font-size:20px}
+    .brand h1{font-size:19px}
+    .lic-chip{font-size:12px;color:var(--sub);background:#0b1428;border:1px solid var(--border);
+        padding:6px 12px;border-radius:20px;display:flex;gap:8px;align-items:center}
+    .lic-chip b{color:var(--ok)}
+    .card{background:rgba(17,28,51,.85);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px}
+    .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+    .field label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px}
+    .field input,.field select,.field textarea{width:100%;padding:10px 12px;background:#0b1428;border:1px solid var(--border);
+        border-radius:8px;color:var(--txt);font-size:14px;outline:none;font-family:inherit;transition:.2s}
+    .field textarea{resize:vertical}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+    .key-row{display:flex;gap:8px}
+    .key-row input{flex:1}
+    .mini-btn{padding:10px 16px;border:1px solid var(--accent);background:transparent;color:var(--accent);
+        border-radius:8px;cursor:pointer;font-size:13px;white-space:nowrap}
+    .mini-btn:hover{background:rgba(59,130,246,.12)}
+    .hint{font-size:12px;color:var(--sub);margin-top:6px;min-height:16px}
+    .hint.ok{color:var(--ok)} .hint.err{color:var(--err)}
+    .key-help{margin-top:10px;font-size:12px;color:#5a6b8c;line-height:1.8}
+    .key-help a{color:var(--accent2);text-decoration:none}
+    .key-help summary{cursor:pointer;color:var(--accent2)}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{background:rgba(59,130,246,.15);border:1px solid #2b4a7a;color:#9ec1ff;
+        padding:4px 10px;border-radius:14px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
+    .chip .x{cursor:pointer;color:var(--err);font-weight:bold}
+    .add-btn{padding:7px 14px;background:transparent;border:1px dashed #2b4a7a;color:#9ec1ff;border-radius:8px;cursor:pointer;font-size:13px}
+    .add-btn:hover{background:rgba(59,130,246,.1)}
+    .actions{display:flex;gap:10px;margin-top:6px}
+    .big{flex:1;padding:14px;font-size:15px}
+    .stop{background:#3a2330;border:none;color:#fca5a5}
+    .stop:disabled{opacity:.4}
+    .prog{text-align:center;color:var(--sub);font-size:13px;margin:14px 0}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+    .stat{background:#0b1428;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+    .stat .n{font-size:24px;font-weight:700;color:var(--accent2)}
+    .stat .l{font-size:12px;color:var(--sub);margin-top:4px}
+    .dl{display:flex;gap:10px}
+    .dl button{flex:1;padding:11px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:14px}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th,td{border-bottom:1px solid #1a2540;padding:8px 10px;text-align:left;white-space:nowrap}
+    th{color:var(--sub);font-weight:600;background:#0b1428;position:sticky;top:0}
+    .tbl-wrap{max-height:380px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+    h3{font-size:15px;margin-bottom:12px}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+
+<div id="gate">
+    <div class="gate-card">
+        <div class="gate-logo">📍</div>
+        <h1>高德商家采集工具</h1>
+        <div class="gate-sub">请输入卡密激活后使用</div>
+        <div class="field">
+            <label>卡密</label>
+            <input id="cardInput" type="text" placeholder="XXXXXXXXXXXXX" autocomplete="off">
+        </div>
+        <div style="height:14px"></div>
+        <button class="btn" id="gateBtn" onclick="doLogin()">激 活 进 入</button>
+        <div class="gate-status" id="gateStatus"></div>
+        <div class="gate-foot">卡密请联系作者购买</div>
+    </div>
+</div>
+
+<div id="main">
+    <div class="topbar">
+        <div class="brand">
+            <div class="dot">📍</div>
             <h1>高德商家采集工具</h1>
         </div>
+        <div class="lic-chip" id="licChip"></div>
+    </div>
 
-        <div class="card">
-            <div class="form-grid">
-                <div class="form-item full-width">
-                    <label>API Key</label>
-                    <div class="key-row">
-                        <input type="text" id="apiKey" placeholder="请输入你的高德API Key">
-                        <button class="btn-load" id="loadBtn" onclick="loadProvinces()">加载地区</button>
-                    </div>
-                    <div class="status" id="regionStatus">输入 Key 后点右侧「加载地区」</div>
-                    <div class="key-help">
-                        没有 Key？<a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">去高德开放平台申请</a>
-                        <details>
-                            <summary>创建步骤</summary>
-                            <div class="steps">
-                                1. 打开高德开放平台，登录或注册账号<br>
-                                2. 进入控制台 → 应用管理 → 创建新应用<br>
-                                3. 点「添加 Key」，服务平台选「Web服务」，IP 白名单留空<br>
-                                4. 复制生成的 Key，粘贴到上面的输入框
-                            </div>
-                        </details>
-                    </div>
+    <div class="card">
+        <div class="row">
+            <div class="field" style="grid-column:1/-1">
+                <label>API Key</label>
+                <div class="key-row">
+                    <input id="apiKey" placeholder="高德开放平台 Web 服务 Key">
+                    <button class="mini-btn" onclick="loadProvinces()">加载地区</button>
                 </div>
-                <div class="form-item">
-                    <label>省份</label>
-                    <select id="province" onchange="onProvinceChange()">
-                        <option value="">-- 请先加载地区 --</option>
-                    </select>
-                </div>
-                <div class="form-item">
-                    <label>城市</label>
-                    <select id="city" onchange="onCityChange()">
-                        <option value="">-- 请选择省份 --</option>
-                    </select>
-                </div>
-                <div class="form-item">
-                    <label>区县（可选）</label>
-                    <select id="district">
-                        <option value="">-- 全部 --</option>
-                    </select>
-                </div>
-                <div class="form-item full-width">
-                    <button class="btn-add" onclick="addRegion()">＋ 加入采集地区</button>
-                    <div class="region-chips" id="regionChips"></div>
-                    <div class="region-empty" id="regionEmpty">未添加地区时，将使用上面当前选中的省/市/区</div>
-                </div>
-                <div class="form-item full-width">
-                    <label>搜索关键词（每行一个，支持多个）</label>
-                    <textarea id="keywords" rows="3" placeholder="美食&#10;酒店&#10;KTV"></textarea>
-                </div>
-                <div class="form-item">
-                    <label>每个关键词最大页数</label>
-                    <input type="number" id="maxPages" value="20" min="1" max="50">
-                </div>
-                <div class="form-item">
-                    <label>城市限制</label>
-                    <select id="citylimit">
-                        <option value="true">只搜该城市</option>
-                        <option value="false">不限城市</option>
-                    </select>
+                <div class="hint" id="regionHint">输入 Key 后点「加载地区」</div>
+                <div class="key-help">
+                    没有 Key？<a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">去高德开放平台申请</a>
+                    <details><summary>创建步骤</summary>
+                        1. 登录高德开放平台 → 控制台 → 应用管理 → 创建应用<br>
+                        2. 添加 Key，服务平台选「Web服务」，IP 白名单留空<br>
+                        3. 复制 Key 粘贴到上面
+                    </details>
                 </div>
             </div>
-
-            <div class="btn-group">
-                <button class="btn-primary" id="startBtn" onclick="startSearch()">开始采集</button>
-                <button class="btn-warning" id="stopBtn" onclick="stopSearch()" disabled>停止</button>
+            <div class="field"><label>省份</label><select id="province" onchange="onProvinceChange()"><option>-- 先加载地区 --</option></select></div>
+            <div class="field"><label>城市</label><select id="city" onchange="onCityChange()"><option>-- 先选省 --</option></select></div>
+            <div class="field"><label>区县（可选）</label><select id="district"><option value="">-- 全部 --</option></select></div>
+            <div class="field" style="grid-column:1/-1">
+                <button class="add-btn" onclick="addRegion()">＋ 加入采集地区</button>
+                <div class="chips" id="regionChips"></div>
+                <div class="hint" id="regionEmpty">未添加地区时，将使用上面当前选中的省/市/区</div>
             </div>
-
-            <div class="progress-info" id="progressInfo">就绪</div>
-
-            <div class="stats" id="stats" style="display: none;">
-                <div class="stat-item">
-                    <div class="stat-num" id="totalNum">0</div>
-                    <div class="stat-label">总结果数</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-num" id="collectedNum">0</div>
-                    <div class="stat-label">已采集</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-num" id="hasPhoneNum">0</div>
-                    <div class="stat-label">含电话</div>
-                </div>
+            <div class="field" style="grid-column:1/-1">
+                <label>搜索关键词（每行一个，支持多个）</label>
+                <textarea id="keywords" rows="3" placeholder="美食&#10;酒店&#10;KTV"></textarea>
             </div>
-
-            <div class="download-btns" id="downloadBtns" style="display: none;">
-                <button class="btn-success" onclick="downloadExcel()">下载 Excel</button>
-                <button class="btn-success" onclick="downloadCSV()">下载 CSV</button>
+            <div class="field"><label>每个关键词最大页数</label><input type="number" id="maxPages" value="20" min="1" max="50"></div>
+            <div class="field"><label>城市限制</label>
+                <select id="citylimit"><option value="true">只搜该城市</option><option value="false">不限城市</option></select>
             </div>
         </div>
-
-        <div class="card" id="resultCard" style="display: none;">
-            <h3 style="margin-bottom: 15px;">采集结果（前50条预览）</h3>
-            <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
-                <table class="result-table">
-                    <thead>
-                        <tr>
-                            <th>序号</th>
-                            <th>商家名称</th>
-                            <th>地址</th>
-                            <th>电话</th>
-                            <th>类目</th>
-                            <th>区域</th>
-                            <th>关键词</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultBody"></tbody>
-                </table>
-            </div>
+        <div class="actions">
+            <button class="btn big" id="startBtn" onclick="startSearch()">开始采集</button>
+            <button class="btn big stop" id="stopBtn" onclick="stopSearch()" disabled>停止</button>
+        </div>
+        <div class="prog" id="progressInfo">就绪</div>
+        <div class="stats" id="stats" style="display:none">
+            <div class="stat"><div class="n" id="totalNum">0</div><div class="l">总结果</div></div>
+            <div class="stat"><div class="n" id="collectedNum">0</div><div class="l">已采集</div></div>
+            <div class="stat"><div class="n" id="hasPhoneNum">0</div><div class="l">含电话</div></div>
+        </div>
+        <div class="dl" id="dlBtns" style="display:none">
+            <button onclick="downloadExcel()">下载 Excel</button>
+            <button onclick="downloadCSV()">下载 CSV</button>
         </div>
     </div>
 
-    <script>
-        let allResults = [];
-        let isRunning = false;
-        let callbackIndex = 0;
-        let seenIds = new Set();
-        let selectedRegions = [];
+    <div class="card" id="resultCard" style="display:none">
+        <h3>采集结果（前 50 条预览）</h3>
+        <div class="tbl-wrap">
+        <table>
+            <thead><tr><th>#</th><th>商家名称</th><th>地址</th><th>电话</th><th>类目</th><th>区域</th><th>关键词</th></tr></thead>
+            <tbody id="resultBody"></tbody>
+        </table>
+        </div>
+    </div>
+</div>
 
-        function setRegionStatus(text, type) {
-            const el = document.getElementById('regionStatus');
-            el.textContent = text;
-            el.className = 'status' + (type ? ' ' + type : '');
+<script>
+const AUTH_API = "https://amap.bilin.eu.org/web/verify";
+let allResults=[], isRunning=false, callbackIndex=0, seenIds=new Set(), selectedRegions=[];
+
+function machineId(){
+    let m = localStorage.getItem("amap_mid");
+    if(!m){ m = "WEB-" + (crypto.randomUUID?crypto.randomUUID().replace(/-/g,""):"xxxxxxxx").toUpperCase().slice(0,24);
+            localStorage.setItem("amap_mid", m); }
+    return m;
+}
+
+async function doLogin(){
+    const card = document.getElementById("cardInput").value.trim().toUpperCase();
+    const st = document.getElementById("gateStatus");
+    const btn = document.getElementById("gateBtn");
+    if(!card){ st.className="gate-status err"; st.textContent="请输入卡密"; return; }
+    btn.disabled = true; st.className="gate-status"; st.textContent="正在验证...";
+    try{
+        const r = await fetch(AUTH_API,{method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({card, machine:machineId()})});
+        const j = await r.json();
+        if(j.ok){
+            localStorage.setItem("amap_card", card);
+            enterMain(j);
+        }else{
+            st.className="gate-status err"; st.textContent = j.reason || "卡密无效";
         }
+    }catch(e){
+        st.className="gate-status err"; st.textContent="网络异常，无法连接授权服务器";
+    }finally{ btn.disabled = false; }
+}
 
-        window.onload = function() {
-            const savedKey = localStorage.getItem('amap_key');
-            const savedKeywords = localStorage.getItem('amap_keywords');
-            const savedMaxPages = localStorage.getItem('amap_maxPages');
-            const savedCitylimit = localStorage.getItem('amap_citylimit');
+function fmtRemain(ms){
+    const d = Math.floor(ms/86400000);
+    if(d >= 365) return "长期有效";
+    if(d >= 1) return "剩余 " + d + " 天";
+    return "剩余不足 1 天";
+}
 
-            if (savedKey) document.getElementById('apiKey').value = savedKey;
-            if (savedKeywords) document.getElementById('keywords').value = savedKeywords;
-            if (savedMaxPages) document.getElementById('maxPages').value = savedMaxPages;
-            if (savedCitylimit) document.getElementById('citylimit').value = savedCitylimit;
+function enterMain(j){
+    document.getElementById("gate").style.display="none";
+    document.getElementById("main").style.display="block";
+    const chip = document.getElementById("licChip");
+    chip.innerHTML = "授权：<b>"+(j.type_name||"已激活")+"</b> · "+fmtRemain(j.remaining_ms||0);
+    restoreSettings();
+}
 
-            if (savedKey) loadProvinces(true);
-        };
+window.onload = function(){
+    const saved = localStorage.getItem("amap_card");
+    if(saved){
+        document.getElementById("cardInput").value = saved;
+        doLogin();
+    }
+};
 
-        function saveSettings() {
-            localStorage.setItem('amap_key', document.getElementById('apiKey').value.trim());
-            localStorage.setItem('amap_keywords', document.getElementById('keywords').value.trim());
-            localStorage.setItem('amap_maxPages', document.getElementById('maxPages').value);
-            localStorage.setItem('amap_citylimit', document.getElementById('citylimit').value);
-        }
+function restoreSettings(){
+    const k=localStorage.getItem("amap_key"), kw=localStorage.getItem("amap_keywords"),
+          mp=localStorage.getItem("amap_maxPages"), cl=localStorage.getItem("amap_citylimit");
+    if(k) document.getElementById("apiKey").value=k;
+    if(kw) document.getElementById("keywords").value=kw;
+    if(mp) document.getElementById("maxPages").value=mp;
+    if(cl) document.getElementById("citylimit").value=cl;
+    if(k) loadProvinces();
+}
+function saveSettings(){
+    localStorage.setItem("amap_key", document.getElementById("apiKey").value.trim());
+    localStorage.setItem("amap_keywords", document.getElementById("keywords").value.trim());
+    localStorage.setItem("amap_maxPages", document.getElementById("maxPages").value);
+    localStorage.setItem("amap_citylimit", document.getElementById("citylimit").value);
+}
 
-        function jsonpRequest(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'amapCallback' + (callbackIndex++);
-                const script = document.createElement('script');
-                let done = false;
+function jsonpRequest(url){
+    return new Promise((resolve,reject)=>{
+        const cb="amapCb"+(callbackIndex++), sc=document.createElement("script");
+        let done=false;
+        const cl=()=>{delete window[cb]; sc.parentNode&&sc.parentNode.removeChild(sc);};
+        const t=setTimeout(()=>{if(done)return;done=true;cl();reject(new Error("请求超时"));},12000);
+        window[cb]=(d)=>{if(done)return;done=true;clearTimeout(t);cl();resolve(d);};
+        sc.src=url+"&callback="+cb;
+        sc.onerror=()=>{if(done)return;done=true;clearTimeout(t);cl();reject(new Error("网络错误"));};
+        document.body.appendChild(sc);
+    });
+}
 
-                function cleanup() {
-                    delete window[callbackName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                }
+function fillSel(id,items,ph){
+    const el=document.getElementById(id); el.innerHTML="";
+    const f=document.createElement("option"); f.value=""; f.textContent=ph; el.appendChild(f);
+    items.forEach(it=>{const o=document.createElement("option");o.value=it.name;o.textContent=it.name;el.appendChild(o);});
+}
+function setHint(t,cls){const e=document.getElementById("regionHint");e.textContent=t;e.className="hint"+(cls?" "+cls:"");}
 
-                const timer = setTimeout(() => {
-                    if (done) return;
-                    done = true;
-                    cleanup();
-                    reject(new Error('请求超时，请检查网络或 Key 是否有效'));
-                }, 12000);
+async function loadProvinces(){
+    const key=document.getElementById("apiKey").value.trim();
+    if(!key){setHint("请先输入 API Key","err");return;}
+    setHint("正在加载省份...");
+    try{
+        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent("中国")+"&subdistrict=1");
+        if(d.status!=="1"){setHint("加载失败："+d.info+"（"+d.infocode+"）","err");return;}
+        const ps=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
+        fillSel("province",ps,"-- 请选择省份 --");
+        fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
+        setHint("已加载 "+ps.length+" 个省份","ok"); saveSettings();
+    }catch(e){setHint("加载失败："+e.message,"err");}
+}
+async function onProvinceChange(){
+    const pn=document.getElementById("province").value, key=document.getElementById("apiKey").value.trim();
+    fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
+    if(!pn)return;
+    setHint("加载 "+pn+" 城市...");
+    try{
+        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent(pn)+"&subdistrict=1");
+        const cs=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
+        fillSel("city",cs,"-- 请选择城市 --"); setHint("已加载 "+cs.length+" 个城市","ok");
+    }catch(e){setHint("加载城市失败","err");}
+}
+async function onCityChange(){
+    const cn=document.getElementById("city").value, key=document.getElementById("apiKey").value.trim();
+    fillSel("district",[],"-- 全部 --");
+    if(!cn)return;
+    setHint("加载 "+cn+" 区县...");
+    try{
+        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent(cn)+"&subdistrict=1");
+        const ds=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
+        fillSel("district",ds,"-- 全部 --"); setHint("已加载 "+ds.length+" 个区县","ok");
+    }catch(e){setHint("加载区县失败","err");}
+}
 
-                window[callbackName] = (data) => {
-                    if (done) return;
-                    done = true;
-                    clearTimeout(timer);
-                    cleanup();
-                    resolve(data);
-                };
+function regionLabel(r){return (r.province||"")+(r.city||"")+(r.district||"");}
+function renderChips(){
+    const box=document.getElementById("regionChips"), empty=document.getElementById("regionEmpty");
+    box.innerHTML="";
+    selectedRegions.forEach((r,i)=>{
+        const c=document.createElement("span"); c.className="chip"; c.textContent=regionLabel(r);
+        const x=document.createElement("span"); x.className="x"; x.textContent="×";
+        x.onclick=()=>{selectedRegions.splice(i,1);renderChips();};
+        c.appendChild(x); box.appendChild(c);
+    });
+    empty.style.display = selectedRegions.length?"none":"block";
+}
+function addRegion(){
+    const p=document.getElementById("province").value, c=document.getElementById("city").value, d=document.getElementById("district").value;
+    if(!p||!c){alert("请先选择省和城市");return;}
+    if(selectedRegions.some(r=>r.province===p&&r.city===c&&r.district===d)){alert("该地区已在列表");return;}
+    selectedRegions.push({province:p,city:c,district:d}); renderChips();
+}
 
-                script.src = url + '&callback=' + callbackName;
-                script.onerror = () => {
-                    if (done) return;
-                    done = true;
-                    clearTimeout(timer);
-                    cleanup();
-                    reject(new Error('请求失败，请检查网络连接'));
-                };
-                document.body.appendChild(script);
-            });
-        }
-
-        function fillSelect(selectId, items, placeholder) {
-            const select = document.getElementById(selectId);
-            select.innerHTML = '';
-            const first = document.createElement('option');
-            first.value = '';
-            first.textContent = placeholder;
-            select.appendChild(first);
-            items.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.name;
-                option.textContent = item.name;
-                select.appendChild(option);
-            });
-        }
-
-        function regionLabel(r) {
-            return (r.province || '') + (r.city || '') + (r.district || '');
-        }
-
-        function renderChips() {
-            const box = document.getElementById('regionChips');
-            const empty = document.getElementById('regionEmpty');
-            box.innerHTML = '';
-            selectedRegions.forEach((r, idx) => {
-                const chip = document.createElement('span');
-                chip.className = 'chip';
-                chip.textContent = regionLabel(r);
-                const x = document.createElement('span');
-                x.className = 'x';
-                x.textContent = '×';
-                x.onclick = () => { selectedRegions.splice(idx, 1); renderChips(); };
-                chip.appendChild(x);
-                box.appendChild(chip);
-            });
-            empty.style.display = selectedRegions.length ? 'none' : 'block';
-        }
-
-        function addRegion() {
-            const province = document.getElementById('province').value;
-            const city = document.getElementById('city').value;
-            const district = document.getElementById('district').value;
-
-            if (!province || !city) {
-                alert('请先选择省份和城市');
-                return;
-            }
-
-            const dup = selectedRegions.find(r => r.province === province && r.city === city && r.district === district);
-            if (dup) {
-                alert('该地区已在列表中');
-                return;
-            }
-
-            selectedRegions.push({ province, city, district });
-            renderChips();
-            setRegionStatus('已添加地区：' + regionLabel({ province, city, district }), 'ok');
-        }
-
-        async function loadProvinces(silent) {
-            const key = document.getElementById('apiKey').value.trim();
-            if (!key) {
-                setRegionStatus('请先输入 API Key', 'err');
-                return;
-            }
-
-            const btn = document.getElementById('loadBtn');
-            btn.disabled = true;
-            setRegionStatus('正在加载省份列表...');
-
-            try {
-                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent('中国') + '&subdistrict=1');
-
-                if (data.status !== '1') {
-                    setRegionStatus('加载失败：' + data.info + '（错误码 ' + data.infocode + '）', 'err');
-                    return;
-                }
-
-                const provinces = (data.districts && data.districts[0] && data.districts[0].districts) || [];
-                if (!provinces.length) {
-                    setRegionStatus('加载失败：返回省份为空，请确认 Key 为「Web服务」类型', 'err');
-                    return;
-                }
-
-                fillSelect('province', provinces, '-- 请选择省份 --');
-                fillSelect('city', [], '-- 请选择省份 --');
-                fillSelect('district', [], '-- 全部 --');
-                setRegionStatus('已加载 ' + provinces.length + ' 个省份，请选择省份', 'ok');
-                saveSettings();
-            } catch (e) {
-                setRegionStatus('加载失败：' + e.message, 'err');
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        async function onProvinceChange() {
-            const provinceName = document.getElementById('province').value;
-            const key = document.getElementById('apiKey').value.trim();
-
-            fillSelect('city', [], '-- 请选择城市 --');
-            fillSelect('district', [], '-- 全部 --');
-
-            if (!provinceName) {
-                setRegionStatus('请选择省份');
-                return;
-            }
-
-            setRegionStatus('正在加载 ' + provinceName + ' 的城市...');
-
-            try {
-                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent(provinceName) + '&subdistrict=1');
-
-                if (data.status !== '1') {
-                    setRegionStatus('加载城市失败：' + data.info, 'err');
-                    return;
-                }
-
-                const cities = (data.districts && data.districts[0] && data.districts[0].districts) || [];
-                fillSelect('city', cities, '-- 请选择城市 --');
-                setRegionStatus('已加载 ' + cities.length + ' 个城市，请选择城市', 'ok');
-            } catch (e) {
-                setRegionStatus('加载城市失败：' + e.message, 'err');
-            }
-        }
-
-        async function onCityChange() {
-            const cityName = document.getElementById('city').value;
-            const key = document.getElementById('apiKey').value.trim();
-
-            fillSelect('district', [], '-- 全部 --');
-
-            if (!cityName) return;
-
-            setRegionStatus('正在加载 ' + cityName + ' 的区县...');
-
-            try {
-                const data = await jsonpRequest('https://restapi.amap.com/v3/config/district?key=' + key + '&keywords=' + encodeURIComponent(cityName) + '&subdistrict=1');
-
-                if (data.status !== '1') {
-                    setRegionStatus('加载区县失败：' + data.info, 'err');
-                    return;
-                }
-
-                const districts = (data.districts && data.districts[0] && data.districts[0].districts) || [];
-                fillSelect('district', districts, '-- 全部 --');
-                setRegionStatus('已加载 ' + districts.length + ' 个区县', 'ok');
-            } catch (e) {
-                setRegionStatus('加载区县失败：' + e.message, 'err');
+async function collectOne(key,city,district,kw,maxPages,citylimit){
+    let sk=kw; if(district) sk=district+" "+kw;
+    for(let page=1; page<=maxPages && isRunning; page++){
+        document.getElementById("progressInfo").textContent=city+"｜"+kw+"：第 "+page+" 页（累计 "+allResults.length+" 条）";
+        const url="https://restapi.amap.com/v3/place/text?key="+key+"&keywords="+encodeURIComponent(sk)+
+            "&city="+encodeURIComponent(city)+"&citylimit="+citylimit+"&page_size=20&page_num="+(page-1)+"&extensions=all";
+        let d;
+        try{ d=await jsonpRequest(url); }catch(e){ alert("请求失败："+e.message); break; }
+        if(d.status!=="1"){ alert("错误（"+city+"｜"+kw+"）："+d.info); break; }
+        (d.pois||[]).forEach(poi=>{
+            if(typeof poi==="string")return;
+            if(poi.id && seenIds.has(poi.id))return;
+            if(poi.id) seenIds.add(poi.id);
+            allResults.push({"商家名称":poi.name||"","地址":poi.address||"","电话":poi.tel||"","类目":poi.type||"",
+                "省份":poi.pname||"","城市":poi.cityname||"","区域":poi.adname||"","关键词":kw,
+                "经度":poi.location?poi.location.split(",")[0]:"","纬度":poi.location?poi.location.split(",")[1]:""});
+        });
+        updateStats(); renderTable();
+        if(!(d.pois||[]).length) break;
+        await new Promise(r=>setTimeout(r,500));
+    }
+}
+async function startSearch(){
+    const key=document.getElementById("apiKey").value.trim();
+    const kwRaw=document.getElementById("keywords").value.trim();
+    const maxPages=parseInt(document.getElementById("maxPages").value,10);
+    const cl=document.getElementById("citylimit").value;
+    if(!key){alert("请输入 API Key");return;}
+    if(!kwRaw){alert("请输入关键词");return;}
+    const kws=kwRaw.split(/[\n,，、;；]+/).map(s=>s.trim()).filter(Boolean);
+    let regions=selectedRegions.slice();
+    if(!regions.length){
+        const p=document.getElementById("province").value,c=document.getElementById("city").value,d=document.getElementById("district").value;
+        if(!p||!c){alert("请先选省/市，或加入采集地区");return;}
+        regions=[{province:p,city:c,district:d}];
+    }
+    saveSettings();
+    document.getElementById("startBtn").disabled=true;
+    document.getElementById("stopBtn").disabled=false;
+    allResults=[]; seenIds=new Set(); isRunning=true;
+    const total=regions.length*kws.length; let idx=0;
+    try{
+        for(const r of regions){ if(!isRunning)break;
+            for(const kw of kws){ if(!isRunning)break; idx++;
+                document.getElementById("progressInfo").textContent="任务 "+idx+"/"+total+"："+r.city+"｜"+kw;
+                await collectOne(key,r.city,r.district,kw,maxPages,cl);
             }
         }
-
-        async function collectOne(key, city, district, keyword, maxPages, citylimit) {
-            let searchKeywords = keyword;
-            if (district) searchKeywords = district + ' ' + keyword;
-
-            let currentPage = 1;
-            while (isRunning && currentPage <= maxPages) {
-                document.getElementById('progressInfo').textContent =
-                    city + '｜' + keyword + '：正在采集第 ' + currentPage + ' 页...（累计 ' + allResults.length + ' 条）';
-
-                const apiUrl = 'https://restapi.amap.com/v3/place/text?key=' + key + '&keywords=' + encodeURIComponent(searchKeywords) + '&city=' + encodeURIComponent(city) + '&citylimit=' + citylimit + '&page_size=20&page_num=' + (currentPage - 1) + '&extensions=all';
-
-                const data = await jsonpRequest(apiUrl);
-
-                if (data.status !== '1') {
-                    alert('错误（' + city + '｜' + keyword + '）：' + data.info);
-                    break;
-                }
-
-                const pois = data.pois || [];
-
-                pois.forEach(poi => {
-                    if (typeof poi === 'string') return;
-                    if (poi.id && seenIds.has(poi.id)) return;
-                    if (poi.id) seenIds.add(poi.id);
-
-                    allResults.push({
-                        '商家名称': poi.name || '',
-                        '地址': poi.address || '',
-                        '电话': poi.tel || '',
-                        '类目': poi.type || '',
-                        '省份': poi.pname || '',
-                        '城市': poi.cityname || '',
-                        '区域': poi.adname || '',
-                        '关键词': keyword,
-                        '经度': poi.location ? poi.location.split(',')[0] : '',
-                        '纬度': poi.location ? poi.location.split(',')[1] : ''
-                    });
-                });
-
-                updateStats();
-                renderTable();
-
-                if (pois.length === 0) break;
-                currentPage++;
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-
-        async function startSearch() {
-            const key = document.getElementById('apiKey').value.trim();
-            const keywordsRaw = document.getElementById('keywords').value.trim();
-            const maxPages = parseInt(document.getElementById('maxPages').value, 10);
-            const citylimit = document.getElementById('citylimit').value === 'true';
-
-            if (!key) { alert('请输入API Key'); return; }
-            if (!keywordsRaw) { alert('请输入至少一个搜索关键词'); return; }
-
-            const keywords = keywordsRaw.split(/[\n,，、;；]+/).map(s => s.trim()).filter(Boolean);
-
-            let regions = selectedRegions.slice();
-            if (regions.length === 0) {
-                const province = document.getElementById('province').value;
-                const city = document.getElementById('city').value;
-                const district = document.getElementById('district').value;
-                if (!province || !city) { alert('请先选择省/市，或点「加入采集地区」添加多个地区'); return; }
-                regions = [{ province, city, district }];
-            }
-
-            saveSettings();
-
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-            allResults = [];
-            seenIds = new Set();
-            isRunning = true;
-
-            const totalTasks = regions.length * keywords.length;
-            let taskIdx = 0;
-
-            try {
-                for (const region of regions) {
-                    if (!isRunning) break;
-                    for (const kw of keywords) {
-                        if (!isRunning) break;
-                        taskIdx++;
-                        document.getElementById('progressInfo').textContent =
-                            '任务 ' + taskIdx + '/' + totalTasks + '：' + region.city + '｜' + kw;
-                        await collectOne(key, region.city, region.district, kw, maxPages, citylimit);
-                    }
-                }
-                finish();
-            } catch (e) {
-                alert('出错了：' + e.message);
-                finish();
-            }
-        }
-
-        function stopSearch() {
-            isRunning = false;
-            document.getElementById('progressInfo').textContent = '已手动停止';
-            finish();
-        }
-
-        function finish() {
-            isRunning = false;
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            const hasPhone = allResults.filter(r => r['电话'] && r['电话'] !== '[]').length;
-            document.getElementById('progressInfo').textContent = '采集完成！共 ' + allResults.length + ' 条（含电话 ' + hasPhone + ' 条）';
-            document.getElementById('downloadBtns').style.display = 'flex';
-            document.getElementById('resultCard').style.display = 'block';
-        }
-
-        function updateStats() {
-            document.getElementById('stats').style.display = 'flex';
-            document.getElementById('totalNum').textContent = allResults.length;
-            document.getElementById('collectedNum').textContent = allResults.length;
-            const hasPhone = allResults.filter(r => r['电话'] && r['电话'] !== '[]').length;
-            document.getElementById('hasPhoneNum').textContent = hasPhone;
-        }
-
-        function renderTable() {
-            const tbody = document.getElementById('resultBody');
-            tbody.innerHTML = '';
-            allResults.slice(0, 50).forEach((item, idx) => {
-                const tr = document.createElement('tr');
-                const cells = [idx + 1, item['商家名称'], item['地址'], item['电话'], item['类目'], item['区域'], item['关键词']];
-                cells.forEach(value => {
-                    const td = document.createElement('td');
-                    td.textContent = value;
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-        }
-
-        function downloadExcel() {
-            const ws = XLSX.utils.json_to_sheet(allResults);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, '商家数据');
-            const timestamp = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(wb, '高德商家_' + timestamp + '.xlsx');
-        }
-
-        function downloadCSV() {
-            const headers = Object.keys(allResults[0]);
-            let csv = headers.join(',') + '\n';
-            allResults.forEach(row => {
-                csv += headers.map(h => '"' + String(row[h] || '').replace(/"/g, '""') + '"').join(',') + '\n';
-            });
-            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = '高德商家_' + new Date().toISOString().slice(0, 10) + '.csv';
-            a.click();
-        }
-    </script>
+    }finally{ finish(); }
+}
+function stopSearch(){isRunning=false; finish();}
+function finish(){
+    isRunning=false;
+    document.getElementById("startBtn").disabled=false;
+    document.getElementById("stopBtn").disabled=true;
+    const hp=allResults.filter(r=>r["电话"]&&r["电话"]!=="[]").length;
+    document.getElementById("progressInfo").textContent="采集完成！共 "+allResults.length+" 条（含电话 "+hp+" 条）";
+    document.getElementById("dlBtns").style.display="flex";
+    document.getElementById("resultCard").style.display="block";
+}
+function updateStats(){
+    document.getElementById("stats").style.display="grid";
+    document.getElementById("totalNum").textContent=allResults.length;
+    document.getElementById("collectedNum").textContent=allResults.length;
+    document.getElementById("hasPhoneNum").textContent=allResults.filter(r=>r["电话"]&&r["电话"]!=="[]").length;
+}
+function renderTable(){
+    const tb=document.getElementById("resultBody"); tb.innerHTML="";
+    allResults.slice(0,50).forEach((it,i)=>{
+        const tr=document.createElement("tr");
+        [i+1,it["商家名称"],it["地址"],it["电话"],it["类目"],it["区域"],it["关键词"]].forEach(v=>{
+            const td=document.createElement("td"); td.textContent=v; tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+    });
+}
+function downloadExcel(){
+    const ws=XLSX.utils.json_to_sheet(allResults);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"商家数据");
+    XLSX.writeFile(wb,"高德商家_"+new Date().toISOString().slice(0,10)+".xlsx");
+}
+function downloadCSV(){
+    const h=Object.keys(allResults[0]);
+    let csv=h.join(",")+"\n";
+    allResults.forEach(r=>{csv+=h.map(k=>'"'+String(r[k]||"").replace(/"/g,'""')+'"').join(",")+"\n";});
+    const b=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(b);
+    a.download="高德商家_"+new Date().toISOString().slice(0,10)+".csv"; a.click();
+}
+</script>
 </body>
 </html>
