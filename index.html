@@ -114,9 +114,9 @@
     <div class="card">
         <div class="row">
             <div class="field" style="grid-column:1/-1">
-                <label>API Key</label>
+                <label>API Key（多个 Key 每行一个，自动轮换抗限流）</label>
                 <div class="key-row">
-                    <input id="apiKey" placeholder="高德开放平台 Web 服务 Key">
+                    <textarea id="apiKey" rows="2" placeholder="高德 Web 服务 Key&#10;多个 Key 每行一个"></textarea>
                     <button class="mini-btn" onclick="loadProvinces()">加载地区</button>
                 </div>
                 <div class="hint" id="regionHint">输入 Key 后点「加载地区」</div>
@@ -125,7 +125,7 @@
                     <details><summary>创建步骤</summary>
                         1. 登录高德开放平台 → 控制台 → 应用管理 → 创建应用<br>
                         2. 添加 Key，服务平台选「Web服务」，IP 白名单留空<br>
-                        3. 复制 Key 粘贴到上面
+                        3. 复制 Key 粘贴到上面（可多个，每行一个）
                     </details>
                 </div>
             </div>
@@ -177,6 +177,10 @@
 <script>
 const AUTH_API = "https://newspapers-speeds-selections-cir.trycloudflare.com/web/verify";
 let allResults=[], isRunning=false, callbackIndex=0, seenIds=new Set(), selectedRegions=[];
+let keyIdx=0;
+function getKeys(){
+    return document.getElementById("apiKey").value.split(/[\n,，;；\s]+/).map(s=>s.trim()).filter(Boolean);
+}
 
 function machineId(){
     let m = localStorage.getItem("amap_mid");
@@ -266,8 +270,9 @@ function fillSel(id,items,ph){
 function setHint(t,cls){const e=document.getElementById("regionHint");e.textContent=t;e.className="hint"+(cls?" "+cls:"");}
 
 async function loadProvinces(){
-    const key=document.getElementById("apiKey").value.trim();
-    if(!key){setHint("请先输入 API Key","err");return;}
+    const keys=getKeys();
+    if(!keys.length){setHint("请先输入 API Key","err");return;}
+    const key=keys[0];
     setHint("正在加载省份...");
     try{
         const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent("中国")+"&subdistrict=1");
@@ -275,27 +280,27 @@ async function loadProvinces(){
         const ps=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
         fillSel("province",ps,"-- 请选择省份 --");
         fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
-        setHint("已加载 "+ps.length+" 个省份","ok"); saveSettings();
+        setHint("已加载 "+ps.length+" 个省份（共 "+keys.length+" 个 Key）","ok"); saveSettings();
     }catch(e){setHint("加载失败："+e.message,"err");}
 }
 async function onProvinceChange(){
-    const pn=document.getElementById("province").value, key=document.getElementById("apiKey").value.trim();
-    fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
-    if(!pn)return;
+    const pn=document.getElementById("province").value, keys=getKeys();
+    fillSel("city",[],"-- 先省 --"); fillSel("district",[],"-- 全部 --");
+    if(!pn||!keys.length)return;
     setHint("加载 "+pn+" 城市...");
     try{
-        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent(pn)+"&subdistrict=1");
+        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+keys[0]+"&keywords="+encodeURIComponent(pn)+"&subdistrict=1");
         const cs=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
         fillSel("city",cs,"-- 请选择城市 --"); setHint("已加载 "+cs.length+" 个城市","ok");
     }catch(e){setHint("加载城市失败","err");}
 }
 async function onCityChange(){
-    const cn=document.getElementById("city").value, key=document.getElementById("apiKey").value.trim();
+    const cn=document.getElementById("city").value, keys=getKeys();
     fillSel("district",[],"-- 全部 --");
-    if(!cn)return;
+    if(!cn||!keys.length)return;
     setHint("加载 "+cn+" 区县...");
     try{
-        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+key+"&keywords="+encodeURIComponent(cn)+"&subdistrict=1");
+        const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+keys[0]+"&keywords="+encodeURIComponent(cn)+"&subdistrict=1");
         const ds=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
         fillSel("district",ds,"-- 全部 --"); setHint("已加载 "+ds.length+" 个区县","ok");
     }catch(e){setHint("加载区县失败","err");}
@@ -320,26 +325,28 @@ function addRegion(){
     selectedRegions.push({province:p,city:c,district:d}); renderChips();
 }
 
-async function fetchPage(url, tries){
-    for(let i=0;i<tries && isRunning;i++){
+async function fetchPage(baseUrl, keys){
+    const n=keys.length, attempts=n*2;
+    for(let i=0;i<attempts && isRunning;i++){
+        const key=keys[keyIdx % n]; keyIdx++;
         try{
-            const d=await jsonpRequest(url);
+            const d=await jsonpRequest(baseUrl+"&key="+key);
             if(d.status==="1") return d;
-            await new Promise(r=>setTimeout(r,2000*(i+1)));
+            await new Promise(r=>setTimeout(r,1200));
         }catch(e){
-            await new Promise(r=>setTimeout(r,2000*(i+1)));
+            await new Promise(r=>setTimeout(r,1200));
         }
     }
     return null;
 }
 
-async function collectOne(key,city,district,kw,maxPages,citylimit){
+async function collectOne(keys,city,district,kw,maxPages,citylimit){
     let sk=kw; if(district) sk=district+" "+kw;
     for(let page=1; page<=maxPages && isRunning; page++){
         document.getElementById("progressInfo").textContent=city+"｜"+kw+"：第 "+page+" 页（累计 "+allResults.length+" 条）";
-        const url="https://restapi.amap.com/v3/place/text?key="+key+"&keywords="+encodeURIComponent(sk)+
+        const base="https://restapi.amap.com/v3/place/text?keywords="+encodeURIComponent(sk)+
             "&city="+encodeURIComponent(city)+"&citylimit="+citylimit+"&page_size=20&page_num="+(page-1)+"&extensions=all";
-        const d=await fetchPage(url, 3);
+        const d=await fetchPage(base, keys);
         if(!d){ document.getElementById("progressInfo").textContent+="（此关键词接口失败，跳过）"; break; }
         (d.pois||[]).forEach(poi=>{
             if(typeof poi==="string")return;
@@ -355,11 +362,11 @@ async function collectOne(key,city,district,kw,maxPages,citylimit){
     }
 }
 async function startSearch(){
-    const key=document.getElementById("apiKey").value.trim();
+    const keys=getKeys();
     const kwRaw=document.getElementById("keywords").value.trim();
     const maxPages=parseInt(document.getElementById("maxPages").value,10);
     const cl=document.getElementById("citylimit").value;
-    if(!key){alert("请输入 API Key");return;}
+    if(!keys.length){alert("请输入 API Key");return;}
     if(!kwRaw){alert("请输入关键词");return;}
     const kws=kwRaw.split(/[\n,，、;；]+/).map(s=>s.trim()).filter(Boolean);
     let regions=selectedRegions.slice();
@@ -371,13 +378,13 @@ async function startSearch(){
     saveSettings();
     document.getElementById("startBtn").disabled=true;
     document.getElementById("stopBtn").disabled=false;
-    allResults=[]; seenIds=new Set(); isRunning=true;
+    allResults=[]; seenIds=new Set(); isRunning=true; keyIdx=0;
     const total=regions.length*kws.length; let idx=0;
     try{
         for(const r of regions){ if(!isRunning)break;
             for(const kw of kws){ if(!isRunning)break; idx++;
                 document.getElementById("progressInfo").textContent="任务 "+idx+"/"+total+"："+r.city+"｜"+kw;
-                await collectOne(key,r.city,r.district,kw,maxPages,cl);
+                await collectOne(keys,r.city,r.district,kw,maxPages,cl);
             }
         }
     }finally{ finish(); }
