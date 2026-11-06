@@ -14,8 +14,9 @@
         .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         .form-item label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
-        .form-item input, .form-item select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; }
-        .form-item input:focus, .form-item select:focus { outline: none; border-color: #1890ff; }
+        .form-item input, .form-item select, .form-item textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #fff; font-family: inherit; }
+        .form-item textarea { resize: vertical; }
+        .form-item input:focus, .form-item select:focus, .form-item textarea:focus { outline: none; border-color: #1890ff; }
         .full-width { grid-column: 1 / -1; }
         .key-row { display: flex; gap: 10px; }
         .key-row input { flex: 1; }
@@ -25,6 +26,7 @@
         .btn-success { background: #52c41a; color: white; }
         .btn-warning { background: #faad14; color: white; }
         .btn-load { background: #1890ff; color: white; padding: 10px 18px; font-size: 14px; white-space: nowrap; }
+        .btn-add { background: #fff; color: #1890ff; border: 1px solid #1890ff; padding: 8px 16px; font-size: 13px; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .status { font-size: 13px; margin-top: 8px; min-height: 18px; color: #666; }
         .status.ok { color: #52c41a; }
@@ -35,6 +37,10 @@
         .key-help details { margin-top: 6px; }
         .key-help summary { cursor: pointer; color: #1890ff; }
         .key-help .steps { margin-top: 6px; line-height: 1.9; color: #777; }
+        .region-chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { background: #e6f4ff; color: #1890ff; border: 1px solid #91caff; padding: 4px 10px; border-radius: 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+        .chip .x { cursor: pointer; font-weight: bold; color: #ff4d4f; }
+        .region-empty { font-size: 13px; color: #999; }
         .progress-info { text-align: center; color: #666; margin: 15px 0; font-size: 14px; }
         .result-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         .result-table th, .result-table td { border: 1px solid #eee; padding: 8px 10px; text-align: left; }
@@ -93,12 +99,17 @@
                         <option value="">-- 全部 --</option>
                     </select>
                 </div>
-                <div class="form-item">
-                    <label>搜索关键词</label>
-                    <input type="text" id="keywords" placeholder="如：美食、酒店">
+                <div class="form-item full-width">
+                    <button class="btn-add" onclick="addRegion()">＋ 加入采集地区</button>
+                    <div class="region-chips" id="regionChips"></div>
+                    <div class="region-empty" id="regionEmpty">未添加地区时，将使用上面当前选中的省/市/区</div>
+                </div>
+                <div class="form-item full-width">
+                    <label>搜索关键词（每行一个，支持多个）</label>
+                    <textarea id="keywords" rows="3" placeholder="美食&#10;酒店&#10;KTV"></textarea>
                 </div>
                 <div class="form-item">
-                    <label>最大采集页数</label>
+                    <label>每个关键词最大页数</label>
                     <input type="number" id="maxPages" value="20" min="1" max="50">
                 </div>
                 <div class="form-item">
@@ -150,6 +161,7 @@
                             <th>电话</th>
                             <th>类目</th>
                             <th>区域</th>
+                            <th>关键词</th>
                         </tr>
                     </thead>
                     <tbody id="resultBody"></tbody>
@@ -163,6 +175,7 @@
         let isRunning = false;
         let callbackIndex = 0;
         let seenIds = new Set();
+        let selectedRegions = [];
 
         function setRegionStatus(text, type) {
             const el = document.getElementById('regionStatus');
@@ -242,6 +255,49 @@
                 option.textContent = item.name;
                 select.appendChild(option);
             });
+        }
+
+        function regionLabel(r) {
+            return (r.province || '') + (r.city || '') + (r.district || '');
+        }
+
+        function renderChips() {
+            const box = document.getElementById('regionChips');
+            const empty = document.getElementById('regionEmpty');
+            box.innerHTML = '';
+            selectedRegions.forEach((r, idx) => {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = regionLabel(r);
+                const x = document.createElement('span');
+                x.className = 'x';
+                x.textContent = '×';
+                x.onclick = () => { selectedRegions.splice(idx, 1); renderChips(); };
+                chip.appendChild(x);
+                box.appendChild(chip);
+            });
+            empty.style.display = selectedRegions.length ? 'none' : 'block';
+        }
+
+        function addRegion() {
+            const province = document.getElementById('province').value;
+            const city = document.getElementById('city').value;
+            const district = document.getElementById('district').value;
+
+            if (!province || !city) {
+                alert('请先选择省份和城市');
+                return;
+            }
+
+            const dup = selectedRegions.find(r => r.province === province && r.city === city && r.district === district);
+            if (dup) {
+                alert('该地区已在列表中');
+                return;
+            }
+
+            selectedRegions.push({ province, city, district });
+            renderChips();
+            setRegionStatus('已添加地区：' + regionLabel({ province, city, district }), 'ok');
         }
 
         async function loadProvinces(silent) {
@@ -337,24 +393,75 @@
             }
         }
 
+        async function collectOne(key, city, district, keyword, maxPages, citylimit) {
+            let searchKeywords = keyword;
+            if (district) searchKeywords = district + ' ' + keyword;
+
+            let currentPage = 1;
+            while (isRunning && currentPage <= maxPages) {
+                document.getElementById('progressInfo').textContent =
+                    city + '｜' + keyword + '：正在采集第 ' + currentPage + ' 页...（累计 ' + allResults.length + ' 条）';
+
+                const apiUrl = 'https://restapi.amap.com/v3/place/text?key=' + key + '&keywords=' + encodeURIComponent(searchKeywords) + '&city=' + encodeURIComponent(city) + '&citylimit=' + citylimit + '&page_size=20&page_num=' + (currentPage - 1) + '&extensions=all';
+
+                const data = await jsonpRequest(apiUrl);
+
+                if (data.status !== '1') {
+                    alert('错误（' + city + '｜' + keyword + '）：' + data.info);
+                    break;
+                }
+
+                const pois = data.pois || [];
+
+                pois.forEach(poi => {
+                    if (typeof poi === 'string') return;
+                    if (poi.id && seenIds.has(poi.id)) return;
+                    if (poi.id) seenIds.add(poi.id);
+
+                    allResults.push({
+                        '商家名称': poi.name || '',
+                        '地址': poi.address || '',
+                        '电话': poi.tel || '',
+                        '类目': poi.type || '',
+                        '省份': poi.pname || '',
+                        '城市': poi.cityname || '',
+                        '区域': poi.adname || '',
+                        '关键词': keyword,
+                        '经度': poi.location ? poi.location.split(',')[0] : '',
+                        '纬度': poi.location ? poi.location.split(',')[1] : ''
+                    });
+                });
+
+                updateStats();
+                renderTable();
+
+                if (pois.length === 0) break;
+                currentPage++;
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
         async function startSearch() {
             const key = document.getElementById('apiKey').value.trim();
-            const city = document.getElementById('city').value;
-            const district = document.getElementById('district').value;
-            const keywords = document.getElementById('keywords').value.trim();
+            const keywordsRaw = document.getElementById('keywords').value.trim();
             const maxPages = parseInt(document.getElementById('maxPages').value, 10);
             const citylimit = document.getElementById('citylimit').value === 'true';
 
             if (!key) { alert('请输入API Key'); return; }
-            if (!city) { alert('请选择城市'); return; }
-            if (!keywords) { alert('请输入搜索关键词'); return; }
+            if (!keywordsRaw) { alert('请输入至少一个搜索关键词'); return; }
+
+            const keywords = keywordsRaw.split(/[\n,，、;；]+/).map(s => s.trim()).filter(Boolean);
+
+            let regions = selectedRegions.slice();
+            if (regions.length === 0) {
+                const province = document.getElementById('province').value;
+                const city = document.getElementById('city').value;
+                const district = document.getElementById('district').value;
+                if (!province || !city) { alert('请先选择省/市，或点「加入采集地区」添加多个地区'); return; }
+                regions = [{ province, city, district }];
+            }
 
             saveSettings();
-
-            let searchKeywords = keywords;
-            if (district) {
-                searchKeywords = district + ' ' + keywords;
-            }
 
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
@@ -362,52 +469,20 @@
             seenIds = new Set();
             isRunning = true;
 
+            const totalTasks = regions.length * keywords.length;
+            let taskIdx = 0;
+
             try {
-                let currentPage = 1;
-                let total = 0;
-
-                while (isRunning && currentPage <= maxPages) {
-                    document.getElementById('progressInfo').textContent = '正在采集第 ' + currentPage + ' 页...';
-
-                    const apiUrl = 'https://restapi.amap.com/v3/place/text?key=' + key + '&keywords=' + encodeURIComponent(searchKeywords) + '&city=' + encodeURIComponent(city) + '&citylimit=' + citylimit + '&page_size=20&page_num=' + (currentPage - 1) + '&extensions=all';
-
-                    const data = await jsonpRequest(apiUrl);
-
-                    if (data.status !== '1') {
-                        alert('错误：' + data.info);
-                        break;
+                for (const region of regions) {
+                    if (!isRunning) break;
+                    for (const kw of keywords) {
+                        if (!isRunning) break;
+                        taskIdx++;
+                        document.getElementById('progressInfo').textContent =
+                            '任务 ' + taskIdx + '/' + totalTasks + '：' + region.city + '｜' + kw;
+                        await collectOne(key, region.city, region.district, kw, maxPages, citylimit);
                     }
-
-                    total = parseInt(data.count, 10) || 0;
-                    const pois = data.pois || [];
-
-                    pois.forEach(poi => {
-                        if (typeof poi === 'string') return;
-                        if (poi.id && seenIds.has(poi.id)) return;
-                        if (poi.id) seenIds.add(poi.id);
-
-                        allResults.push({
-                            '商家名称': poi.name || '',
-                            '地址': poi.address || '',
-                            '电话': poi.tel || '',
-                            '类目': poi.type || '',
-                            '省份': poi.pname || '',
-                            '城市': poi.cityname || '',
-                            '区域': poi.adname || '',
-                            '经度': poi.location ? poi.location.split(',')[0] : '',
-                            '纬度': poi.location ? poi.location.split(',')[1] : ''
-                        });
-                    });
-
-                    updateStats();
-                    renderTable();
-
-                    if (allResults.length >= total || pois.length === 0) break;
-                    currentPage++;
-                    document.getElementById('progressInfo').textContent = '已采集 ' + allResults.length + ' / ' + total + ' 条';
-                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
-
                 finish();
             } catch (e) {
                 alert('出错了：' + e.message);
@@ -444,7 +519,7 @@
             tbody.innerHTML = '';
             allResults.slice(0, 50).forEach((item, idx) => {
                 const tr = document.createElement('tr');
-                const cells = [idx + 1, item['商家名称'], item['地址'], item['电话'], item['类目'], item['区域']];
+                const cells = [idx + 1, item['商家名称'], item['地址'], item['电话'], item['类目'], item['区域'], item['关键词']];
                 cells.forEach(value => {
                     const td = document.createElement('td');
                     td.textContent = value;
