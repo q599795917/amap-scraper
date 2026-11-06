@@ -280,7 +280,7 @@ async function loadProvinces(){
 }
 async function onProvinceChange(){
     const pn=document.getElementById("province").value, key=document.getElementById("apiKey").value.trim();
-    fillSel("city",[],"-- 先省 --"); fillSel("district",[],"-- 全部 --");
+    fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
     if(!pn)return;
     setHint("加载 "+pn+" 城市...");
     try{
@@ -320,15 +320,27 @@ function addRegion(){
     selectedRegions.push({province:p,city:c,district:d}); renderChips();
 }
 
+async function fetchPage(url, tries){
+    for(let i=0;i<tries && isRunning;i++){
+        try{
+            const d=await jsonpRequest(url);
+            if(d.status==="1") return d;
+            await new Promise(r=>setTimeout(r,2000*(i+1)));
+        }catch(e){
+            await new Promise(r=>setTimeout(r,2000*(i+1)));
+        }
+    }
+    return null;
+}
+
 async function collectOne(key,city,district,kw,maxPages,citylimit){
     let sk=kw; if(district) sk=district+" "+kw;
     for(let page=1; page<=maxPages && isRunning; page++){
         document.getElementById("progressInfo").textContent=city+"｜"+kw+"：第 "+page+" 页（累计 "+allResults.length+" 条）";
         const url="https://restapi.amap.com/v3/place/text?key="+key+"&keywords="+encodeURIComponent(sk)+
             "&city="+encodeURIComponent(city)+"&citylimit="+citylimit+"&page_size=20&page_num="+(page-1)+"&extensions=all";
-        let d;
-        try{ d=await jsonpRequest(url); }catch(e){ alert("请求失败："+e.message); break; }
-        if(d.status!=="1"){ alert("错误（"+city+"｜"+kw+"）："+d.info); break; }
+        const d=await fetchPage(url, 3);
+        if(!d){ document.getElementById("progressInfo").textContent+="（此关键词接口失败，跳过）"; break; }
         (d.pois||[]).forEach(poi=>{
             if(typeof poi==="string")return;
             if(poi.id && seenIds.has(poi.id))return;
@@ -339,7 +351,7 @@ async function collectOne(key,city,district,kw,maxPages,citylimit){
         });
         updateStats(); renderTable();
         if(!(d.pois||[]).length) break;
-        await new Promise(r=>setTimeout(r,500));
+        await new Promise(r=>setTimeout(r,600));
     }
 }
 async function startSearch(){
