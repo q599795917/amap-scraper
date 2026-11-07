@@ -125,12 +125,12 @@
                     <details><summary>创建步骤</summary>
                         1. 登录高德开放平台 → 控制台 → 应用管理 → 创建应用<br>
                         2. 添加 Key，服务平台选「Web服务」，IP 白名单留空<br>
-                        3. 复制 Key 粘贴到上面（可多个，每行一个）
+                        3. 复制 Key 粘贴到上面
                     </details>
                 </div>
             </div>
-            <div class="field"><label>省份</label><select id="province" onchange="onProvinceChange()"><option>-- 先加载地区 --</option></select></div>
-            <div class="field"><label>城市</label><select id="city" onchange="onCityChange()"><option>-- 先选省 --</option></select></div>
+            <div class="field"><label>省份</label><select id="province" onchange="onProvinceChange()"><option value="">-- 先加载地区 --</option></select></div>
+            <div class="field"><label>城市</label><select id="city" onchange="onCityChange()"><option value="">-- 先选省 --</option></select></div>
             <div class="field"><label>区县（可选）</label><select id="district"><option value="">-- 全部 --</option></select></div>
             <div class="field" style="grid-column:1/-1">
                 <button class="add-btn" onclick="addRegion()">＋ 加入采集地区</button>
@@ -376,6 +376,12 @@ async function startSearch(){
         regions=[{province:p,city:c,district:d}];
     }
     saveSettings();
+    regions = regions.filter(r => r.city && !r.city.startsWith("--"));
+    if(!regions.length){
+        alert("请先选省/市，或加入采集地区");
+        document.getElementById("startBtn").disabled=false;
+        return;
+    }
     document.getElementById("startBtn").disabled=true;
     document.getElementById("stopBtn").disabled=false;
     allResults=[]; seenIds=new Set(); isRunning=true; keyIdx=0;
