@@ -341,11 +341,11 @@ async function fetchPage(baseUrl, keys){
 }
 
 async function collectOne(keys,city,district,kw,maxPages,citylimit){
-    let sk=kw; if(district) sk=district+" "+kw;
+    const searchCity = district || city;
     for(let page=1; page<=maxPages && isRunning; page++){
-        document.getElementById("progressInfo").textContent=city+"｜"+kw+"：第 "+page+" 页（累计 "+allResults.length+" 条）";
-        const base="https://restapi.amap.com/v3/place/text?keywords="+encodeURIComponent(sk)+
-            "&city="+encodeURIComponent(city)+"&citylimit="+citylimit+"&page_size=20&page_num="+(page-1)+"&extensions=all";
+        document.getElementById("progressInfo").textContent=city+(district?"-"+district:"")+"｜"+kw+"：第 "+page+" 页（累计 "+allResults.length+" 条）";
+        const base="https://restapi.amap.com/v3/place/text?keywords="+encodeURIComponent(kw)+
+            "&city="+encodeURIComponent(searchCity)+"&citylimit="+citylimit+"&page_size=20&page_num="+(page-1)+"&extensions=all";
         const d=await fetchPage(base, keys);
         if(!d){ document.getElementById("progressInfo").textContent+="（此关键词接口失败，跳过）"; break; }
         (d.pois||[]).forEach(poi=>{
