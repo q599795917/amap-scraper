@@ -279,7 +279,7 @@ async function loadProvinces(){
         if(d.status!=="1"){setHint("加载失败："+d.info+"（"+d.infocode+"）","err");return;}
         const ps=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
         fillSel("province",ps,"-- 请选择省份 --");
-        fillSel("city",[],"-- 先选省 --"); fillSel("district",[],"-- 全部 --");
+        fillSel("city",[],"-- 先省 --"); fillSel("district",[],"-- 全部 --");
         setHint("已加载 "+ps.length+" 个省份（共 "+keys.length+" 个 Key）","ok"); saveSettings();
     }catch(e){setHint("加载失败："+e.message,"err");}
 }
@@ -382,6 +382,20 @@ async function startSearch(){
         document.getElementById("startBtn").disabled=false;
         return;
     }
+    const expanded=[];
+    for(const r of regions){
+        if(r.district){ expanded.push(r); continue; }
+        setHint("正在枚举 "+r.city+" 区县...");
+        try{
+            const keys0=getKeys();
+            const d=await jsonpRequest("https://restapi.amap.com/v3/config/district?key="+keys0[0]+"&keywords="+encodeURIComponent(r.city)+"&subdistrict=1");
+            const ds=(d.districts&&d.districts[0]&&d.districts[0].districts)||[];
+            if(ds.length>1){
+                ds.forEach(it=>{ if(it&&it.name) expanded.push({province:r.province,city:r.city,district:it.name}); });
+            } else { expanded.push(r); }
+        }catch(e){ expanded.push(r); }
+    }
+    regions=expanded;
     document.getElementById("startBtn").disabled=true;
     document.getElementById("stopBtn").disabled=false;
     allResults=[]; seenIds=new Set(); isRunning=true; keyIdx=0;
